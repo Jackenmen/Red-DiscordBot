@@ -10,13 +10,13 @@ arbitrary paths can be added by the user - these user-defined paths are
 particularly useful for cog development.
 
 Internally, this modifies use of the `__path__` attribute of the
-``redbot.cogs`` package. When extra paths are added to a package's
+``redbot.ext_cogs`` package. When extra paths are added to a package's
 `__path__` attribute, they are used to locate sub-packages.
 
 The precedence of paths goes:
 1. Install path
 2. User-defined paths
-3. Core path
+3. Core path (redbot.cogs)
 
 This is so users who wish to modify core cogs can do so by copying or
 installing cogs into a user-defined/core path, and this modified one
@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Union, List, Optional, Set
 
 import redbot.cogs
+import redbot.ext_cogs
 from redbot.core.utils import deduplicate_iterables
 import discord
 
@@ -74,7 +75,7 @@ class CogManager:
         self.config.register_global(paths=[], install_path=str(default_cog_install_path))
 
     async def initialize(self) -> None:
-        redbot.cogs.__path__ = list(map(str, await self.paths()))
+        redbot.ext_cogs.__path__ = [str(p) for p in (await self.paths())[:-1]]
 
     async def paths(self) -> List[Path]:
         """Get all currently valid path directories, in order of priority
@@ -144,7 +145,7 @@ class CogManager:
             raise ValueError("The install path must be an existing directory.")
         resolved = path.resolve()
         await self.config.install_path.set(str(resolved))
-        redbot.cogs.__path__[0] = str(resolved)
+        redbot.ext_cogs.__path__[0] = str(resolved)
         return resolved
 
     @staticmethod
@@ -196,7 +197,7 @@ class CogManager:
         if path not in current_paths:
             current_paths.append(path)
             await self.set_paths(current_paths)
-            redbot.cogs.__path__.insert(-1, str(path))
+            redbot.ext_cogs.__path__.append(str(path))
 
     async def remove_path(self, path: Union[Path, str]) -> None:
         """Remove a path from the current paths list.
@@ -212,7 +213,7 @@ class CogManager:
 
         paths.remove(path)
         await self.set_paths(paths)
-        redbot.cogs.__path__.remove(str(path))
+        redbot.ext_cogs.__path__.remove(str(path))
 
     async def reorder_path(self, path: Union[Path, str], new_index: int) -> None:
         """Reorder a path in the user-defined paths list.
@@ -227,7 +228,7 @@ class CogManager:
         paths.insert(new_index, path)
         await self.set_paths(paths)
 
-        redbot.cogs.__path__[1:-1] = list(map(str, paths))
+        redbot.ext_cogs.__path__[1:] = list(map(str, paths))
 
     async def set_paths(self, paths_: List[Path]):
         """Set the current paths list.
@@ -251,16 +252,17 @@ class CogManager:
                 name=name,
             )
 
-        try:
-            module = importlib.import_module(f".{name}", package="redbot.cogs")
-        except ModuleNotFoundError as e:
-            if e.name == f"redbot.cogs.{name}":
-                raise NoSuchCog(
-                    f"No core cog by the name of {name!r} could be found.", name=name
-                ) from e
-            raise
-        
-        return module
+        for parent_package in ("redbot.ext_cogs", "redbot.cogs"):
+            try:
+                module = importlib.import_module(f".{name}", package=parent_package)
+            except ModuleNotFoundError as e:
+                if e.name == f"{parent_package}.{name}":
+                    pass
+                raise
+            else:
+                return module
+
+        raise NoSuchCog(f"No cog by the name of {name!r} could be found.", name=name)
 
     @staticmethod
     def reload(module: types.ModuleType) -> types.ModuleType:
@@ -273,7 +275,15 @@ class CogManager:
         ret = module
         for _ in range(2):  # Do it twice to overwrite old relative imports
             for child_name, lib in sorted(children.items(), key=lambda m: m[0], reverse=True):
-                importlib.reload(lib)
+                try:
+                    importlib.reload(lib)
+                except ModuleNotFoundError as exc:
+                    if exc.name == lib.__name__:
+                        # If the structure of the package changed, we might try to reload a module
+                        # which no longer exists.
+                        pass
+                    else:
+                        raise
                 if lib.__name__ == module.__name__:
                     ret = lib
         return ret
@@ -282,10 +292,11 @@ class CogManager:
     async def available_modules() -> Set[str]:
         """Finds the names of all available modules to load."""
         ret = set()
-        for finder, module_name, is_pkg in pkgutil.iter_modules(redbot.cogs.__path__):
-            # reject package names that can't be valid python identifiers
-            if module_name.isidentifier() and not keyword.iskeyword(module_name):
-                ret.add(module_name)
+        for package in (redbot.cogs, redbot.ext_cogs):
+            for finder, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
+                # reject package names that can't be valid python identifiers
+                if module_name.isidentifier() and not keyword.iskeyword(module_name):
+                    ret.add(module_name)
         return ret
 
 

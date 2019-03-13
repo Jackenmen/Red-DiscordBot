@@ -8,6 +8,7 @@ import sys
 import contextlib
 import weakref
 import functools
+import re
 import types
 from collections import namedtuple, OrderedDict
 from datetime import datetime
@@ -1587,13 +1588,14 @@ class Red(
             while pkg_name in curr_pkgs:
                 curr_pkgs.remove(pkg_name)
 
+    # Pattern to match parent package name of cog module (redbot.cogs. or redbot.ext_cogs.)
+    _COG_PACKAGE_RE = re.compile(r"^redbot\.(?:ext_)?cogs\.")
+
     async def load_extension(self, module: Union[str, types.ModuleType]) -> None:
         # NB: this completely bypasses `discord.ext.commands.Bot._load_from_module_spec`
         if isinstance(module, str):
             module: types.ModuleType = self._cog_mgr.load_cog_module(module)
-        name = module.__name__
-        if name.startswith("redbot.cogs."):
-            name = name[len("redbot.cogs.") :]
+        name = self._COG_PACKAGE_RE.sub("", module.__name__)
 
         if name in self.extensions:
             raise errors.PackageAlreadyLoaded(name)
