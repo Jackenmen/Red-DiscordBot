@@ -88,7 +88,7 @@ class ProcessFormatter(Formatter):
 
 class Repo(RepoJSONMixin):
     GIT_CLONE = (
-        "git clone -c credential.helper= -c core.askpass="
+        "git -c credential.helper= -c core.askpass= clone"
         " --recurse-submodules -b {branch} {url} {folder}"
     )
     GIT_CLONE_NO_BRANCH = (
@@ -99,7 +99,7 @@ class Repo(RepoJSONMixin):
     GIT_LATEST_COMMIT = "git -C {path} rev-parse {branch}"
     GIT_HARD_RESET = "git -C {path} reset --hard origin/{branch} -q"
     GIT_PULL = (
-        "git -c credential.helper= -c core.askpass= -C {path}"
+        "git -C {path} -c credential.helper= -c core.askpass="
         " pull --recurse-submodules -q --ff-only"
     )
     GIT_DIFF_FILE_STATUS = (

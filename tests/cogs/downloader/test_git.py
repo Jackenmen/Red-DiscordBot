@@ -55,7 +55,7 @@ async def test_git_clone_notgit_repo(git_repo, tmp_path):
     notgit_repo = tmp_path / "test_clone_folder"
     p = await git_repo._run(
         ProcessFormatter().format(
-            git_repo.GIT_CLONE, branch=None, url=notgit_repo, folder=tmp_path / "cloned_repo_test"
+            git_repo.GIT_CLONE_NO_BRANCH, url=notgit_repo, folder=tmp_path / "cloned_repo_test"
         )
     )
     assert p.returncode == 128
