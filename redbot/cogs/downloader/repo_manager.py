@@ -302,6 +302,7 @@ class Repo(RepoJSONMixin):
                 rev=descendant_rev,
                 module_name=module_name,
             ),
+            # shouldn't exit code 1 be also valid here?
             debug_only=True,
         )
         if p.returncode == 0:
