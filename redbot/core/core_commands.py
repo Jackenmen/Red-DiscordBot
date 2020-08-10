@@ -438,7 +438,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             embed.add_field(name=_("About Red"), value=about, inline=False)
 
             embed.set_footer(
-                text=_("Bringing joy since 02 Jan 2016 (over {} days ago!)").format(days_since)
+                text=_("Bringing joy since 02 Jan 2016 (over {days_since} days ago!)").format(
+                    days_since=days_since
+                )
             )
             await ctx.send(embed=embed)
         else:
@@ -483,7 +485,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 + "\n"
                 + box(extras, lang="ini")
                 + "\n"
-                + _("Bringing joy since 02 Jan 2016 (over {} days ago!)").format(days_since)
+                + _("Bringing joy since 02 Jan 2016 (over {days_since} days ago!)").format(
+                    days_since=days_since
+                )
                 + "\n\n"
             )
 
@@ -541,9 +545,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 "is stored and why, see {link}.\n\n"
                 "Additionally, 3rd party addons loaded by the bot's owner may or "
                 "may not store additional things. "
-                "You can use `{prefix}mydata 3rdparty` "
+                "You can use {command} "
                 "to view the statements provided by each 3rd-party addition."
-            ).format(link=link, prefix=ctx.clean_prefix)
+            ).format(link=link, command=inline(f"`{ctx.clean_prefix}mydata 3rdparty`"))
         )
 
     # 1/30 minutes. It's not likely to change much and uploads a standalone webpage.
@@ -812,10 +816,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 "Discord has specifically requested this with regard to a deleted user. "
                 "This will remove the user from various anti-abuse measures. "
                 "If you are processing a manual request from a user, you may want "
-                "`{prefix}{command_name}` instead"
+                "{command} instead"
                 "\n\nIf you are sure this is what you intend to do "
                 "please respond with the following:"
-            ).format(prefix=ctx.clean_prefix, command_name="mydata ownermanagement deleteforuser"),
+            ).format(command=inline(f"{ctx.clean_prefix}mydata ownermanagement deleteforuser")),
         ):
             return
         results = await self.bot.handle_data_deletion_request(
@@ -1050,9 +1054,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """
         current = await self.bot._config.embeds()
         await self.bot._config.embeds.set(not current)
-        await ctx.send(
-            _("Embeds are now {} by default.").format(_("disabled") if current else _("enabled"))
-        )
+        if current:
+            await ctx.send(_("Embeds are now disabled by default."))
+        else:
+            await ctx.send(_("Embeds are now enabled by default."))
 
     @embedset.command(name="server", aliases=["guild"])
     @checks.guildowner_or_permissions(administrator=True)
@@ -1072,12 +1077,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         await self.bot._config.guild(ctx.guild).embeds.set(enabled)
         if enabled is None:
             await ctx.send(_("Embeds will now fall back to the global setting."))
+        elif enabled:
+            await ctx.send(_("Embeds are now enabled for this guild."))
         else:
-            await ctx.send(
-                _("Embeds are now {} for this guild.").format(
-                    _("enabled") if enabled else _("disabled")
-                )
-            )
+            await ctx.send(_("Embeds are now disabled for this guild."))
 
     @embedset.command(name="channel")
     @checks.guildowner_or_permissions(administrator=True)
@@ -1097,12 +1100,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         await self.bot._config.channel(ctx.channel).embeds.set(enabled)
         if enabled is None:
             await ctx.send(_("Embeds will now fall back to the global setting."))
+        elif enabled:
+            await ctx.send(_("Embeds are now enabled for this channel."))
         else:
-            await ctx.send(
-                _("Embeds are now {} for this channel.").format(
-                    _("enabled") if enabled else _("disabled")
-                )
-            )
+            await ctx.send(_("Embeds are now disabled for this channel."))
 
     @embedset.command(name="user")
     async def embedset_user(self, ctx: commands.Context, enabled: bool = None):
@@ -1151,8 +1152,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             await ctx.author.send(await self._invite_url())
         except discord.errors.Forbidden:
             await ctx.send(
-                "I couldn't send the invite message to you in DM. "
-                "Either you blocked me or you disabled DMs in this server."
+                _(
+                    "I couldn't send the invite message to you in DM. "
+                    "Either you blocked me or you disabled DMs in this server."
+                )
             )
 
     @commands.group()
@@ -1168,27 +1171,35 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """
         if await self.bot._config.invite_public():
             await self.bot._config.invite_public.set(False)
-            await ctx.send("The invite is now private.")
+            await ctx.send(_("The invite is now private."))
             return
         app_info = await self.bot.application_info()
         if not app_info.bot_public:
             await ctx.send(
-                "I am not a public bot. That means that nobody except "
-                "you can invite me on new servers.\n\n"
-                "You can change this by ticking `Public bot` in "
-                "your token settings: "
-                "https://discordapp.com/developers/applications/me/{0}".format(self.bot.user.id)
+                _(
+                    "I am not a public bot. That means that nobody except "
+                    "you can invite me on new servers.\n\n"
+                    "You can change this by ticking `Public bot` in "
+                    "your token settings: {url}"
+                ).format(
+                    url=f"https://discordapp.com/developers/applications/me/{self.bot.user.id}"
+                )
             )
             return
         if not confirm:
             await ctx.send(
-                "You're about to make the `{0}invite` command public. "
-                "All users will be able to invite me on their server.\n\n"
-                "If you agree, you can type `{0}inviteset public yes`.".format(ctx.clean_prefix)
+                _(
+                    "You're about to make the {command_1} command public. "
+                    "All users will be able to invite me on their server.\n\n"
+                    "If you agree, you can type {command_2}."
+                ).format(
+                    command_1=inline(f"{ctx.clean_prefix}invite"),
+                    command_2=inline(f"{ctx.clean_prefix}inviteset public yes"),
+                )
             )
         else:
             await self.bot._config.invite_public.set(True)
-            await ctx.send("The invite command is now public.")
+            await ctx.send(_("The invite command is now public."))
 
     @inviteset.command()
     async def perms(self, ctx, level: int):
@@ -1206,7 +1217,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         some permissions.
         """
         await self.bot._config.invite_perm.set(level)
-        await ctx.send("The new permissions level has been set.")
+        await ctx.send(_("The new permissions level has been set."))
 
     @commands.command()
     @commands.guild_only()
@@ -1224,7 +1235,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         else:
             if pred.result is True:
                 await ctx.send(_("Alright. Bye :wave:"))
-                log.debug(_("Leaving guild '{}'").format(ctx.guild.name))
+                log.debug(_("Leaving guild '{guild_name}'").format(guild_name=ctx.guild.name))
                 await ctx.guild.leave()
             else:
                 await ctx.send(_("Alright, I'll stay then :)"))
@@ -1261,7 +1272,11 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             await ctx.send(_("I cannot leave a guild I am the owner of."))
             return
 
-        await ctx.send(_("Are you sure you want me to leave {}? (yes/no)").format(guild.name))
+        await ctx.send(
+            _("Are you sure you want me to leave {guild_name}? (yes/no)").format(
+                guild_name=guild.name
+            )
+        )
         pred = MessagePredicate.yes_or_no(ctx)
         try:
             await self.bot.wait_for("message", check=pred, timeout=15)
@@ -1706,11 +1721,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """
         current_setting = await ctx.bot._config.guild(ctx.guild).use_bot_color()
         await ctx.bot._config.guild(ctx.guild).use_bot_color.set(not current_setting)
-        await ctx.send(
-            _("The bot {} use its configured color for embeds.").format(
-                _("will not") if not current_setting else _("will")
-            )
-        )
+        if current_setting:
+            await ctx.send(_("The bot will use its configured color for embeds."))
+        else:
+            await ctx.send(_("The bot will not use its configured color for embeds."))
 
     @_set.command()
     @checks.guildowner()
@@ -1723,11 +1737,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """
         current_setting = await ctx.bot._config.guild(ctx.guild).fuzzy()
         await ctx.bot._config.guild(ctx.guild).fuzzy.set(not current_setting)
-        await ctx.send(
-            _("Fuzzy command search has been {} for this server.").format(
-                _("disabled") if current_setting else _("enabled")
-            )
-        )
+        if current_setting:
+            await ctx.send(_("Fuzzy command search has been disabled for this server."))
+        else:
+            await ctx.send(_("Fuzzy command search has been enabled for this server."))
 
     @_set.command()
     @checks.is_owner()
@@ -1739,11 +1752,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """
         current_setting = await ctx.bot._config.fuzzy()
         await ctx.bot._config.fuzzy.set(not current_setting)
-        await ctx.send(
-            _("Fuzzy command search has been {} in DMs.").format(
-                _("disabled") if current_setting else _("enabled")
-            )
-        )
+        if current_setting:
+            await ctx.send(_("Fuzzy command search has been disabled in DMs."))
+        else:
+            await ctx.send(_("Fuzzy command search has been enabled in DMs."))
 
     @_set.command(aliases=["color"])
     @checks.is_owner()
@@ -1926,8 +1938,8 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                     "Failed to change name. Remember that you can "
                     "only do it up to 2 times an hour. Use "
                     "nicknames if you need frequent changes. "
-                    "`{}set nickname`"
-                ).format(ctx.clean_prefix)
+                    "{command}"
+                ).format(command=inline(f"{ctx.clean_prefix}set nickname"))
             )
         else:
             await ctx.send(_("Done."))
@@ -2213,7 +2225,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             return
 
         await ctx.bot._config.help.page_char_limit.set(limit)
-        await ctx.send(_("Done. The character limit per page has been set to {}.").format(limit))
+        await ctx.send(
+            _("Done. The character limit per page has been set to {number}.").format(number=limit)
+        )
 
     @helpset.command(name="maxpages")
     async def helpset_maxpages(self, ctx: commands.Context, pages: int):
@@ -2232,7 +2246,7 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             return
 
         await ctx.bot._config.help.max_pages_in_guild.set(pages)
-        await ctx.send(_("Done. The page limit has been set to {}.").format(pages))
+        await ctx.send(_("Done. The page limit has been set to {number}.").format(number=pages))
 
     @helpset.command(name="deletedelay")
     @commands.bot_has_permissions(manage_messages=True)
@@ -2256,7 +2270,11 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         if seconds == 0:
             await ctx.send(_("Done. Help messages will not be deleted now."))
         else:
-            await ctx.send(_("Done. The delete delay has been set to {} seconds.").format(seconds))
+            await ctx.send(
+                _("Done. The delete delay has been set to {number} seconds.").format(
+                    number=seconds
+                )
+            )
 
     @helpset.command(name="tagline")
     async def helpset_tagline(self, ctx: commands.Context, *, tagline: str = None):
@@ -2288,20 +2306,24 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """Sends a message to the owner."""
         guild = ctx.message.guild
         author = ctx.message.author
-        footer = _("User ID: {}").format(author.id)
+        footer = _("User ID: {user_id}").format(user_id=author.id)
 
-        if ctx.guild is None:
-            source = _("through DM")
-        else:
-            source = _("from {}").format(guild)
-            footer += _(" | Server ID: {}").format(guild.id)
+        if ctx.guild is not None:
+            footer += _(" | Server ID: {guild_id}").format(guild_id=guild.id)
 
         prefixes = await ctx.bot.get_valid_prefixes()
         prefix = re.sub(rf"<@!?{ctx.me.id}>", f"@{ctx.me.name}".replace("\\", r"\\"), prefixes[0])
 
-        content = _("Use `{}dm {} <text>` to reply to this user").format(prefix, author.id)
+        content = _("Use {command} to reply to this user").format(
+            command=inline(f"{prefix}dm {author.id} <text>")
+        )
 
-        description = _("Sent by {} {}").format(author, source)
+        if ctx.guild is None:
+            description = _("Sent by {author_name} through DM").format(author_name=author)
+        else:
+            description = _("Sent by {author_name} from {guild_name}").format(
+                author_name=author, guild_name=guild
+            )
 
         destinations = await ctx.bot.get_owner_notification_destinations()
 
@@ -2361,10 +2383,11 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
             else:
 
-                msg_text = "{}\nMessage:\n\n{}\n{}".format(description, message, footer)
+                translated = _("Message:")
+                msg_text = f"{description}\n{translated}\n\n{message}\n{footer}"
 
                 try:
-                    await destination.send("{}\n{}".format(content, box(msg_text)))
+                    await destination.send(f"{content}\n{box(msg_text)}")
                 except discord.Forbidden:
                     log.exception(f"Contact failed to {destination}({destination.id})")
                     # Should this automatically opt them out?
@@ -2404,8 +2427,10 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
 
         prefixes = await ctx.bot.get_valid_prefixes()
         prefix = re.sub(rf"<@!?{ctx.me.id}>", f"@{ctx.me.name}".replace("\\", r"\\"), prefixes[0])
-        description = _("Owner of {}").format(ctx.bot.user)
-        content = _("You can reply to this message with {}contact").format(prefix)
+        description = _("Owner of {bot_name}").format(bot_name=ctx.bot.user)
+        content = _("You can reply to this message with {command}").format(
+            command=f"{prefix}contact"
+        )
         if await ctx.embed_requested():
             e = discord.Embed(colour=discord.Colour.red(), description=message)
 
@@ -2419,20 +2444,21 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
                 await destination.send(embed=e)
             except discord.HTTPException:
                 await ctx.send(
-                    _("Sorry, I couldn't deliver your message to {}").format(destination)
+                    _("Sorry, I couldn't deliver your message to {user}").format(user=destination)
                 )
             else:
-                await ctx.send(_("Message delivered to {}").format(destination))
+                await ctx.send(_("Message delivered to {user}").format(user=destination))
         else:
-            response = "{}\nMessage:\n\n{}".format(description, message)
+            translated = _("Message:")
+            response = f"{description}\n{translated}\n\n{message}"
             try:
-                await destination.send("{}\n{}".format(box(response), content))
+                await destination.send(f"{box(response)}\n{content}")
             except discord.HTTPException:
                 await ctx.send(
-                    _("Sorry, I couldn't deliver your message to {}").format(destination)
+                    _("Sorry, I couldn't deliver your message to {user}").format(user=destination)
                 )
             else:
-                await ctx.send(_("Message delivered to {}").format(destination))
+                await ctx.send(_("Message delivered to {user}").format(user=destination))
 
     @commands.command(hidden=True)
     @checks.is_owner()
@@ -2917,8 +2943,8 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
             return await ctx.send(_("There aren't any globally disabled commands."))
 
         if len(disabled_list) > 1:
-            header = _("{} commands are disabled globally.\n").format(
-                humanize_number(len(disabled_list))
+            header = _("{number} commands are disabled globally.\n").format(
+                number=humanize_number(len(disabled_list))
             )
         else:
             header = _("1 command is disabled globally.\n")
@@ -2931,14 +2957,18 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
         """List disabled commands in this server."""
         disabled_list = await self.bot._config.guild(ctx.guild).disabled_commands()
         if not disabled_list:
-            return await ctx.send(_("There aren't any disabled commands in {}.").format(ctx.guild))
+            return await ctx.send(
+                _("There aren't any disabled commands in {guild_name}.").format(
+                    guild_name=ctx.guild
+                )
+            )
 
         if len(disabled_list) > 1:
-            header = _("{} commands are disabled in {}.\n").format(
-                humanize_number(len(disabled_list)), ctx.guild
+            header = _("{number} commands are disabled in {guild_name}.\n").format(
+                number=humanize_number(len(disabled_list)), guild_name=ctx.guild
             )
         else:
-            header = _("1 command is disabled in {}.\n").format(ctx.guild)
+            header = _("1 command is disabled in {guild_name}.\n").format(guild_name=ctx.guild)
         paged = [box(x) for x in pagify(humanize_list(disabled_list), page_length=1000)]
         paged[0] = header + paged[0]
         await ctx.send_interactive(paged)
