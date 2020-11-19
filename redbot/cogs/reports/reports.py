@@ -328,7 +328,7 @@ class Reports(commands.Cog):
             if ctx.channel.permissions_for(ctx.guild.me).manage_messages:
                 try:
                     await ctx.message.delete()
-                except discord.NotFound:
+                except (discord.NotFound, discord.Forbidden):
                     pass
 
     @commands.Cog.listener()
