@@ -1,5 +1,6 @@
 import asyncio
 import discord
+import logging
 import re
 from datetime import timezone
 from typing import Union, Set, Literal, Optional
@@ -12,6 +13,7 @@ from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import pagify, humanize_list
 
 _ = Translator("Filter", __file__)
+log = logging.getLogger("red.cogs.filter")
 
 
 @cog_i18n(_)
@@ -480,6 +482,13 @@ class Filter(commands.Cog):
         hits = await self.filter_hits(message.content, message.channel)
 
         if hits:
+            if guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+                log.error(
+                    "Message deletion has been attempted in a guild (%s) with 2FA requirement,"
+                    " but bot owner doesn't have 2FA enabled.",
+                    guild.id,
+                )
+                return
             # modlog doesn't accept PartialMessageable
             channel = (
                 None
