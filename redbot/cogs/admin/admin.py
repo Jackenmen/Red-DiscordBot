@@ -169,6 +169,14 @@ class Admin(commands.Cog):
         if not ctx.guild.me.guild_permissions.manage_roles:
             await ctx.send(_(NEED_MANAGE_ROLES))
             return
+        if role.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Assigning role has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                role.guild.id,
+            )
+            await ctx.send(_(GENERIC_FORBIDDEN))
+            return
         try:
             await member.add_roles(role)
         except discord.Forbidden:
@@ -198,6 +206,14 @@ class Admin(commands.Cog):
             return
         if not ctx.guild.me.guild_permissions.manage_roles:
             await ctx.send(_(NEED_MANAGE_ROLES))
+            return
+        if role.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Unassigning role has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                role.guild.id,
+            )
+            await ctx.send(_(GENERIC_FORBIDDEN))
             return
         try:
             await member.remove_roles(role)
@@ -276,6 +292,14 @@ class Admin(commands.Cog):
         if not ctx.guild.me.guild_permissions.manage_roles:
             await ctx.send(_(NEED_MANAGE_ROLES))
             return
+        if role.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Editing role has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                role.guild.id,
+            )
+            await ctx.send(_(GENERIC_FORBIDDEN))
+            return
         try:
             await role.edit(reason=reason, color=value)
         except discord.Forbidden:
@@ -308,6 +332,14 @@ class Admin(commands.Cog):
             return
         if not ctx.guild.me.guild_permissions.manage_roles:
             await ctx.send(_(NEED_MANAGE_ROLES))
+            return
+        if role.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Editing role has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                role.guild.id,
+            )
+            await ctx.send(_(GENERIC_FORBIDDEN))
             return
         try:
             await role.edit(reason=reason, name=name)
