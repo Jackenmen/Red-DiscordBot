@@ -42,6 +42,18 @@ class Cleanup(commands.Cog):
         return
 
     @staticmethod
+    async def check_mfa(ctx: commands.Context) -> bool:
+        if ctx.guild.mfa_level == 1 and not ctx.bot.user.mfa_enabled:
+            log.error(
+                "Message cleanup has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                ctx.guild.id,
+            )
+            await ctx.send(_("An unexpected error occurred."))
+            return False
+        return True
+
+    @staticmethod
     async def check_100_plus(ctx: commands.Context, number: int) -> bool:
         """
         Called when trying to delete more than 100 messages at once.
@@ -190,8 +202,10 @@ class Cleanup(commands.Cog):
         """
 
         channel = ctx.channel
-
         author = ctx.author
+
+        if not await self.check_mfa(ctx):
+            return
 
         if number > 100:
             cont = await self.check_100_plus(ctx, number)
@@ -259,6 +273,9 @@ class Cleanup(commands.Cog):
 
         author = ctx.author
 
+        if not await self.check_mfa(ctx):
+            return
+
         if number > 100:
             cont = await self.check_100_plus(ctx, number)
             if not cont:
@@ -323,6 +340,9 @@ class Cleanup(commands.Cog):
         author = ctx.author
         after = None
 
+        if not await self.check_mfa(ctx):
+            return
+
         if message_id:
             try:
                 after = await channel.fetch_message(message_id)
@@ -378,6 +398,9 @@ class Cleanup(commands.Cog):
         author = ctx.author
         before = None
 
+        if not await self.check_mfa(ctx):
+            return
+
         if message_id:
             try:
                 before = await channel.fetch_message(message_id)
@@ -431,6 +454,10 @@ class Cleanup(commands.Cog):
         """
         channel = ctx.channel
         author = ctx.author
+
+        if not await self.check_mfa(ctx):
+            return
+
         try:
             mone = await channel.fetch_message(one)
         except discord.errors.NotFound:
@@ -443,6 +470,7 @@ class Cleanup(commands.Cog):
             return await ctx.send(
                 _("Could not find a message with the ID of {id}.".format(id=two))
             )
+
         to_delete = await self.get_messages_for_deletion(
             channel=channel, before=mtwo, after=mone, delete_pinned=delete_pinned
         )
@@ -478,6 +506,9 @@ class Cleanup(commands.Cog):
 
         channel = ctx.channel
         author = ctx.author
+
+        if not await self.check_mfa(ctx):
+            return
 
         if number > 100:
             cont = await self.check_100_plus(ctx, number)
@@ -516,6 +547,9 @@ class Cleanup(commands.Cog):
 
         channel = ctx.channel
         author = ctx.message.author
+
+        if not await self.check_mfa(ctx):
+            return
 
         if number > 100:
             cont = await self.check_100_plus(ctx, number)
@@ -692,6 +726,9 @@ class Cleanup(commands.Cog):
         """
         msgs = []
         spam = []
+
+        if not await self.check_mfa(ctx):
+            return
 
         def check(m):
             if m.attachments:
