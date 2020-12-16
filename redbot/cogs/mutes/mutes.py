@@ -7,6 +7,7 @@ from abc import ABC
 from typing import cast, Optional, Dict, List, Tuple, Literal, Union
 from datetime import datetime, timedelta, timezone
 
+from .checks import mfa_check
 from .converters import MuteTime
 from .voicemutes import VoiceMutes
 
@@ -1157,6 +1158,7 @@ class Mutes(VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
     @commands.command(usage="<users...> [time_and_reason]")
     @commands.guild_only()
     @checks.mod_or_permissions(manage_roles=True)
+    @mfa_check()
     async def mute(
         self,
         ctx: commands.Context,
@@ -1309,6 +1311,7 @@ class Mutes(VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
     )
     @checks.mod_or_permissions(manage_roles=True)
     @commands.bot_has_guild_permissions(manage_permissions=True)
+    @mfa_check()
     async def channel_mute(
         self,
         ctx: commands.Context,
@@ -1398,6 +1401,7 @@ class Mutes(VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
     @commands.command(usage="<users...> [reason]")
     @commands.guild_only()
     @checks.mod_or_permissions(manage_roles=True)
+    @mfa_check()
     async def unmute(
         self,
         ctx: commands.Context,
@@ -1467,6 +1471,7 @@ class Mutes(VoiceMutes, commands.Cog, metaclass=CompositeMetaClass):
     @checks.mod_or_permissions(manage_roles=True)
     @commands.command(name="unmutechannel", aliases=["channelunmute"], usage="<users...> [reason]")
     @commands.bot_has_guild_permissions(manage_permissions=True)
+    @mfa_check()
     async def unmute_channel(
         self,
         ctx: commands.Context,
