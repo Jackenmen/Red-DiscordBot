@@ -23,6 +23,7 @@ jobs:
         run: |
           python .github/workflows/scripts/bump_version.py
         env:
+          PYTHONPATH: ${{ github.workspace }}:${{ env.PYTHONPATH }}
           NEW_STABLE_VERSION: ${{ github.event.inputs.new_stable_version }}
 
       - name: Create Pull Request
@@ -58,6 +59,7 @@ jobs:
         run: |
           python .github/workflows/scripts/bump_version.py
         env:
+          PYTHONPATH: ${{ github.workspace }}:${{ env.PYTHONPATH }}
           NEW_STABLE_VERSION: ${{ github.event.inputs.new_stable_version }}
           DEV_BUMP: '1'
 
