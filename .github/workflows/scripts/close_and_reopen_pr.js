@@ -1,4 +1,4 @@
-module.exports = ({github, context}) => {
+module.exports = (async function ({github, context}) {
     const pr_number = process.env.PR_NUMBER;
     const pr_operation = process.env.PR_OPERATION;
     let sleep_time = 0;
@@ -22,4 +22,4 @@ module.exports = ({github, context}) => {
 
         sleep_time = 2000;
     }
-}
+})
