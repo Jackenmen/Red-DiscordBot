@@ -10,7 +10,7 @@ jobs:
   pr_bumps:
     runs-on: ubuntu-latest
     steps:
-      # Checkout repository and install Python
+      # Checkout repository and install Python.
       - uses: actions/checkout@v2
       - name: Set up Python
         uses: actions/setup-python@v2
