@@ -689,7 +689,7 @@ class RedBase(
             return False
 
         if guild:
-            assert isinstance(channel, discord.abc.GuildChannel)  # nosec
+            assert isinstance(channel, (discord.abc.GuildChannel, discord.Thread))  # nosec
             if not channel.permissions_for(guild.me).send_messages:
                 return False
             if not (await self.ignored_channel_or_guild(message)):
