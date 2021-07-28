@@ -583,7 +583,10 @@ class Requires:
         if author.voice is not None:
             channels.append(author.voice.channel)
         channels.append(ctx.channel)
-        category = ctx.channel.category
+        if isinstance(ctx.channel, discord.Thread):
+            category = ctx.channel.parent.category
+        else:
+            category = ctx.channel.category
         if category is not None:
             channels.append(category)
 
