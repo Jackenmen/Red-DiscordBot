@@ -586,8 +586,8 @@ class Requires:
             channels.append(ctx.channel.parent)
             category = ctx.channel.parent.category
         else:
-            category = ctx.channel.category
             channels.append(ctx.channel)
+            category = ctx.channel.category
         if category is not None:
             channels.append(category)
 
