@@ -7,6 +7,9 @@ import textwrap
 import traceback
 import types
 import re
+import pydoc
+import sys
+from collections import ChainMap
 from contextlib import redirect_stdout
 from copy import copy
 
@@ -29,6 +32,58 @@ https://github.com/Rapptz/RoboDanny/blob/master/cogs/repl.py
 _ = Translator("Dev", __file__)
 
 START_CODE_BLOCK_RE = re.compile(r"^((```py(thon)?)(?=\s)|(```))")
+
+
+class Helper(pydoc.Helper):
+    """
+    Custom pydoc.Helper that disallows interactive usage.
+
+    This should allow the usage of help(object) without hanging the terminal
+    for most common usage - passing object.
+
+    showsymbol() and showtopic() are currently not implemented.
+    """
+
+    @property
+    def _output(self):
+        return sys.stdout
+
+    @_output.setter
+    def _output(self, value):
+        return
+
+    def __call__(self, request):
+        # this purposefully disallows argument-less calls
+        self.help(request)
+
+    def showsymbol(self, *args, **kwargs):
+        raise TypeError("Showing symbols is not supported in the Dev cog.")
+
+    def showtopic(self, *args, **kwargs):
+        raise TypeError("Showing topics is not supported in the Dev cog.")
+
+
+class _Helper:
+    """
+    Define the builtin 'help'.
+
+    Calling help(thing) prints help for the python object 'thing'.
+    """
+    __PYDOC_HELPER = Helper()
+
+    def __repr__(self):
+        return (
+            "Type help(object) for help about object."
+            " Interactive help is not supported in the Dev cog."
+        )
+
+    def __call__(self, *args, **kwargs):
+        if not args:
+            raise TypeError("Interactive help is not supported in the Dev cog.")
+        return self.__PYDOC_HELPER(*args, **kwargs)
+
+
+HELPER = _Helper()
 
 
 @cog_i18n(_)
@@ -108,6 +163,7 @@ class Dev(commands.Cog):
             "commands": commands,
             "_": self._last_result,
             "__name__": "__main__",
+            "__builtins__": ChainMap({"help": HELPER}, __builtins__),
         }
         for name, value in self.env_extensions.items():
             try:
@@ -238,7 +294,6 @@ class Dev(commands.Cog):
             return
 
         env = self.get_environment(ctx)
-        env["__builtins__"] = __builtins__
         env["_"] = None
         self.sessions[ctx.channel.id] = True
         await ctx.send(
