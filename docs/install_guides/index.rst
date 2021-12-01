@@ -13,6 +13,7 @@ we recommend **Ubuntu 20.04 LTS**.
 
    windows
    mac
+   amazon-linux-2022
    arch
    centos-7
    centos-8
