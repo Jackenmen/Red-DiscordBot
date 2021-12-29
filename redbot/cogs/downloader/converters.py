@@ -1,3 +1,5 @@
+import keyword
+
 import discord
 from redbot.core import commands
 from redbot.core.i18n import Translator
@@ -15,8 +17,19 @@ class InstalledCog(InstalledModule):
 
         cog = discord.utils.get(await downloader.installed_cogs(), name=arg)
         if cog is None:
-            raise commands.BadArgument(
-                _("Cog `{cog_name}` is not installed.").format(cog_name=arg)
-            )
+            if (
+                arg.isidentifier()
+                and not keyword.iskeyword(arg)
+                and await ctx.bot._cog_mgr.find_cog(arg)
+            ):
+                raise commands.BadArgument(
+                    _("Cog `{cog_name}` exists but is not installed through Downloader.").format(
+                        cog_name=arg
+                    )
+                )
+            else:
+                raise commands.BadArgument(
+                    _("Cog `{cog_name}` is not installed.").format(cog_name=arg)
+                )
 
         return cog
