@@ -9,7 +9,7 @@ from redbot import VersionInfo
 
 version, _ = VersionInfo._get_version(ignore_installed=True)
 
-if os.getenv("TOX_RED", False) and sys.version_info >= (3, 10):
+if os.getenv("TOX_RED", False) and sys.version_info >= (3, 11):
     # We want to be able to test Python versions that we do not support yet.
     setup(python_requires=">=3.8.1", version=version)
 else:
