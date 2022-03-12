@@ -261,8 +261,12 @@ def _ensure_no_colorama():
     from rich.console import detect_legacy_windows
 
     if not detect_legacy_windows():
-        import colorama
-        import colorama.initialise
+        try:
+            import colorama
+            import colorama.initialise
+        except ModuleNotFoundError:
+            # colorama isn't installed so we don't have to nuke it
+            return
 
         colorama.deinit()
 
