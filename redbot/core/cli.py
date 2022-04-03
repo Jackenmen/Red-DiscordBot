@@ -4,6 +4,11 @@ import logging
 import sys
 from typing import Optional
 
+import discord
+from discord import __version__ as discord_version
+
+from redbot.core.utils._internal_utils import cli_level_to_log_level
+
 
 def confirm(text: str, default: Optional[bool] = None) -> bool:
     if default is None:
@@ -31,22 +36,25 @@ def confirm(text: str, default: Optional[bool] = None) -> bool:
         print("Error: invalid input")
 
 
-def interactive_config(red, token_set, prefix_set, *, print_header=True):
-    loop = asyncio.get_event_loop()
-    token = ""
+async def interactive_config(red, token_set, prefix_set, *, print_header=True):
+    token = None
 
     if print_header:
         print("Red - Discord Bot | Configuration process\n")
 
     if not token_set:
-        print("Please enter a valid token:")
+        print(
+            "Please enter a valid token.\n"
+            "You can find out how to obtain a token with this guide:\n"
+            "https://docs.discord.red/en/stable/bot_application_guide.html#creating-a-bot-account"
+        )
         while not token:
             token = input("> ")
             if not len(token) >= 50:
                 print("That doesn't look like a valid token.")
-                token = ""
+                token = None
             if token:
-                loop.run_until_complete(red._config.token.set(token))
+                await red._config.token.set(token)
 
     if not prefix_set:
         prefix = ""
@@ -63,9 +71,32 @@ def interactive_config(red, token_set, prefix_set, *, print_header=True):
                 if not confirm("Your prefix seems overly long. Are you sure that it's correct?"):
                     prefix = ""
             if prefix:
-                loop.run_until_complete(red._config.prefix.set([prefix]))
+                await red._config.prefix.set([prefix])
 
     return token
+
+
+def non_negative_int(arg: str) -> int:
+    try:
+        x = int(arg)
+    except ValueError:
+        raise argparse.ArgumentTypeError("The argument has to be a number.")
+    if x < 0:
+        raise argparse.ArgumentTypeError("The argument has to be a non-negative integer.")
+    if x > sys.maxsize:
+        raise argparse.ArgumentTypeError(
+            f"The argument has to be lower than or equal to {sys.maxsize}."
+        )
+    return x
+
+
+def message_cache_size_int(arg: str) -> int:
+    x = non_negative_int(arg)
+    if x < 1000:
+        raise argparse.ArgumentTypeError(
+            "Message cache size has to be greater than or equal to 1000."
+        )
+    return x
 
 
 def parse_cli_flags(args):
@@ -73,6 +104,7 @@ def parse_cli_flags(args):
         description="Red - Discord Bot", usage="redbot <instance_name> [arguments]"
     )
     parser.add_argument("--version", "-V", action="store_true", help="Show Red's current version")
+    parser.add_argument("--debuginfo", action="store_true", help="Show debug information.")
     parser.add_argument(
         "--list-instances",
         action="store_true",
@@ -83,7 +115,7 @@ def parse_cli_flags(args):
         action="store_true",
         help="Edit the instance. This can be done without console interaction "
         "by passing --no-prompt and arguments that you want to change (available arguments: "
-        "--edit-instance-name, --edit-data-path, --copy-data, --owner, --token).",
+        "--edit-instance-name, --edit-data-path, --copy-data, --owner, --token, --prefix).",
     )
     parser.add_argument(
         "--edit-instance-name",
@@ -128,7 +160,9 @@ def parse_cli_flags(args):
         "security implications if misused. Can be "
         "multiple.",
     )
-    parser.add_argument("--prefix", "-p", action="append", help="Global prefix. Can be multiple")
+    parser.add_argument(
+        "--prefix", "-p", action="append", help="Global prefix. Can be multiple", default=[]
+    )
     parser.add_argument(
         "--no-prompt",
         action="store_true",
@@ -154,12 +188,13 @@ def parse_cli_flags(args):
         "process.",
     )
     parser.add_argument(
+        "-v",
+        "--verbose",
         "--debug",
-        action="store_const",
+        action="count",
+        default=0,
         dest="logging_level",
-        const=logging.DEBUG,
-        default=logging.INFO,
-        help="Sets the loggers level as debug",
+        help="Increase the verbosity of the logs, each usage of this flag increases the verbosity level by 1.",
     )
     parser.add_argument("--dev", action="store_true", help="Enables developer mode")
     parser.add_argument(
@@ -191,6 +226,67 @@ def parse_cli_flags(args):
     parser.add_argument(
         "instance_name", nargs="?", help="Name of the bot instance created during `redbot-setup`."
     )
+    parser.add_argument(
+        "--team-members-are-owners",
+        action="store_true",
+        dest="use_team_features",
+        default=False,
+        help=(
+            "Treat application team members as owners. "
+            "This is off by default. Owners can load and run arbitrary code. "
+            "Do not enable if you would not trust all of your team members with "
+            "all of the data on the host machine."
+        ),
+    )
+    parser.add_argument(
+        "--message-cache-size",
+        type=message_cache_size_int,
+        default=1000,
+        help="Set the maximum number of messages to store in the internal message cache.",
+    )
+    parser.add_argument(
+        "--no-message-cache", action="store_true", help="Disable the internal message cache."
+    )
+    parser.add_argument(
+        "--disable-intent",
+        action="append",
+        choices=list(discord.Intents.VALID_FLAGS),  # DEP-WARN
+        default=[],
+        help="Unsupported flag that allows disabling the given intent."
+        " Currently NOT SUPPORTED (and not covered by our version guarantees)"
+        " as Red is not prepared to work without all intents.\n"
+        f"Go to https://discordpy.readthedocs.io/en/v{discord_version}/api.html#discord.Intents"
+        " to see what each intent does.\n"
+        "This flag can be used multiple times to specify multiple intents.",
+    )
+    parser.add_argument(
+        "--force-rich-logging",
+        action="store_true",
+        dest="rich_logging",
+        default=None,
+        help="Forcefully enables the Rich logging handlers. This is normally enabled for supported active terminals.",
+    )
+    parser.add_argument(
+        "--force-disable-rich-logging",
+        action="store_false",
+        dest="rich_logging",
+        default=None,
+        help="Forcefully disables the Rich logging handlers.",
+    )
+    parser.add_argument(
+        "--rich-traceback-extra-lines",
+        type=non_negative_int,
+        default=0,
+        help="Set the number of additional lines of code before and after the executed line"
+        " that should be shown in tracebacks generated by Rich.\n"
+        "Useful for development.",
+    )
+    parser.add_argument(
+        "--rich-traceback-show-locals",
+        action="store_true",
+        help="Enable showing local variables in tracebacks generated by Rich.\n"
+        "Useful for development.",
+    )
 
     args = parser.parse_args(args)
 
@@ -198,5 +294,6 @@ def parse_cli_flags(args):
         args.prefix = sorted(args.prefix, reverse=True)
     else:
         args.prefix = []
+    args.logging_level = cli_level_to_log_level(args.logging_level)
 
     return args

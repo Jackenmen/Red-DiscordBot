@@ -23,7 +23,9 @@ installing cogs into a user-defined/core path, and this modified one
 will be loaded instead.
 """
 import asyncio
+import contextlib
 import importlib.machinery
+import keyword
 import logging
 import pkgutil
 import sys
@@ -59,11 +61,11 @@ class CogManager:
 
     CORE_PATH = Path(redbot.cogs.__file__).parent
 
-    def __init__(self, *, loop: Optional[asyncio.AbstractEventLoop] = None):
-        self.conf = Config.get_conf(self, 2938473984732, True)
+    def __init__(self):
+        self.config = Config.get_conf(self, 2938473984732, True)
         default_cog_install_path = cog_data_path(self) / "cogs"
         default_cog_install_path.mkdir(parents=True, exist_ok=True)
-        self.conf.register_global(paths=[], install_path=str(default_cog_install_path))
+        self.config.register_global(paths=[], install_path=str(default_cog_install_path))
 
     async def initialize(self):
         redbot.ext_cogs.__path__ = [str(p) for p in (await self.paths())[:-1]]
@@ -93,7 +95,7 @@ class CogManager:
             The path to the directory where 3rd party cogs are stored.
 
         """
-        return Path(await self.conf.install_path()).resolve()
+        return Path(await self.config.install_path()).resolve()
 
     async def user_defined_paths(self) -> List[Path]:
         """Get a list of user-defined cog paths.
@@ -106,7 +108,7 @@ class CogManager:
             A list of user-defined paths.
 
         """
-        return list(map(Path, deduplicate_iterables(await self.conf.paths())))
+        return list(map(Path, deduplicate_iterables(await self.config.paths())))
 
     async def set_install_path(self, path: Path) -> Path:
         """Set the install path for 3rd party cogs.
@@ -135,7 +137,7 @@ class CogManager:
         if not path.is_dir():
             raise ValueError("The install path must be an existing directory.")
         resolved = path.resolve()
-        await self.conf.install_path.set(str(resolved))
+        await self.config.install_path.set(str(resolved))
         redbot.ext_cogs.__path__[0] = str(resolved)
         return resolved
 
@@ -152,11 +154,7 @@ class CogManager:
         pathlib.Path
 
         """
-        try:
-            path.exists()
-        except AttributeError:
-            path = Path(path)
-        return path
+        return Path(path)
 
     async def add_path(self, path: Union[Path, str]) -> None:
         """Add a cog path to current list.
@@ -203,7 +201,7 @@ class CogManager:
             Path to remove.
 
         """
-        path = self._ensure_path_obj(path).resolve()
+        path = self._ensure_path_obj(path)
         paths = await self.user_defined_paths()
 
         paths.remove(path)
@@ -235,11 +233,18 @@ class CogManager:
 
         """
         str_paths = list(map(str, paths_))
-        await self.conf.paths.set(str_paths)
+        await self.config.paths.set(str_paths)
 
     @staticmethod
     def load_cog_module(name: str) -> types.ModuleType:
         """Load a cog module or package."""
+        if not name.isidentifier() or keyword.iskeyword(name):
+            # reject package names that can't be valid python identifiers
+            raise errors.NoSuchCog(
+                f"No 3rd party module by the name of '{name}' was found in any available path.",
+                name=name,
+            )
+
         for parent_package in ("redbot.ext_cogs", "redbot.cogs"):
             module_name = ".".join((parent_package, name))
             try:
@@ -285,7 +290,9 @@ class CogManager:
         ret = set()
         for package in (redbot.cogs, redbot.ext_cogs):
             for finder, module_name, ispkg in pkgutil.iter_modules(package.__path__):
-                ret.add(module_name)
+                # reject package names that can't be valid python identifiers
+                if module_name.isidentifier() and not keyword.iskeyword(module_name):
+                    ret.add(module_name)
         return ret
 
 
@@ -295,6 +302,10 @@ _ = Translator("CogManagerUI", __file__)
 @cog_i18n(_)
 class CogManagerUI(commands.Cog):
     """Commands to interface with Red's cog manager."""
+
+    async def red_delete_data_for_user(self, **kwargs):
+        """Nothing to delete (Core Config is handled in a bot method )"""
+        return
 
     @commands.command()
     @checks.is_owner()
@@ -320,7 +331,7 @@ class CogManagerUI(commands.Cog):
 
     @commands.command()
     @checks.is_owner()
-    async def addpath(self, ctx: commands.Context, path: Path):
+    async def addpath(self, ctx: commands.Context, *, path: Path):
         """
         Add a path to the list of available cog paths.
         """
@@ -339,8 +350,7 @@ class CogManagerUI(commands.Cog):
     @checks.is_owner()
     async def removepath(self, ctx: commands.Context, path_number: int):
         """
-        Removes a path from the available cog paths given the path_number
-            from !paths
+        Removes a path from the available cog paths given the `path_number` from `[p]paths`.
         """
         path_number -= 1
         if path_number < 0:
@@ -377,7 +387,7 @@ class CogManagerUI(commands.Cog):
             await ctx.send(_("Invalid 'from' index."))
             return
 
-        await ctx.bot.cog_mgr.reorder_path(to_move, to)
+        await ctx.bot._cog_mgr.reorder_path(to_move, to)
         await ctx.bot._cog_mgr.set_paths(all_paths)
         await ctx.send(_("Paths reordered."))
 
@@ -386,8 +396,9 @@ class CogManagerUI(commands.Cog):
     async def installpath(self, ctx: commands.Context, path: Path = None):
         """
         Returns the current install path or sets it if one is provided.
-            The provided path must be absolute or relative to the bot's
-            directory and it must already exist.
+
+        The provided path must be absolute or relative to the bot's
+        directory and it must already exist.
 
         No installed cogs will be transferred in the process.
         """
@@ -425,10 +436,14 @@ class CogManagerUI(commands.Cog):
             unloaded = _("**{} unloaded:**\n").format(len(unloaded)) + ", ".join(unloaded)
 
             for page in pagify(loaded, delims=[", ", "\n"], page_length=1800):
+                if page.startswith(", "):
+                    page = page[2:]
                 e = discord.Embed(description=page, colour=discord.Colour.dark_green())
                 await ctx.send(embed=e)
 
             for page in pagify(unloaded, delims=[", ", "\n"], page_length=1800):
+                if page.startswith(", "):
+                    page = page[2:]
                 e = discord.Embed(description=page, colour=discord.Colour.dark_red())
                 await ctx.send(embed=e)
         else:

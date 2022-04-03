@@ -3,9 +3,9 @@
 .. role:: python(code)
     :language: python
 
-====================
-Creating cogs for V3
-====================
+========================
+Creating cogs for Red V3
+========================
 
 This guide serves as a tutorial on creating cogs for Red V3.
 It will cover the basics of setting up a package for your
@@ -17,20 +17,33 @@ you in the process.
 Getting started
 ---------------
 
-To start off, be sure that you have installed Python 3.7.
+To start off, be sure that you have installed Python 3.8.
 Next, you need to decide if you want to develop against the Stable or Develop version of Red.
 Depending on what your goal is should help determine which version you need.
 
-.. attention:: 
+.. attention::
     The Develop version may have changes on it which break compatibility with the Stable version and other cogs.
     If your goal is to support both versions, make sure you build compatibility layers or use separate branches to keep compatibility until the next Red release
 
 Open a terminal or command prompt and type one of the following
-    Stable Version: :code:`python3.7 -m pip install -U Red-DiscordBot`
-    
-    Develop Version: :code:`python3.7 -m pip install -U git+https://github.com/Cog-Creators/Red-DiscordBot@V3/develop#egg=Red-DiscordBot`
+    Stable Version: :code:`python3.8 -m pip install -U Red-DiscordBot`
 
-(Windows users may need to use :code:`py -3.7` or :code:`python` instead of :code:`python3.7`)
+.. note::
+
+  To install the development version, replace ``Red-DiscordBot`` in the above commands with the
+  link below. **The development version of the bot contains experimental changes. It is not
+  intended for normal users.** We will not support anyone using the development version in any
+  support channels. Using the development version may break third party cogs and not all core
+  commands may work. Downgrading to stable after installing the development version may cause
+  data loss, crashes or worse. Please keep this in mind when using the development version
+  while working on cog creation.
+
+  .. code-block:: none
+
+      git+https://github.com/Cog-Creators/Red-DiscordBot@V3/develop#egg=Red-DiscordBot
+
+
+(Windows users may need to use :code:`py -3.8` or :code:`python` instead of :code:`python3.8`)
 
 --------------------
 Setting up a package
@@ -70,8 +83,11 @@ In that file, place the following code:
 
     from redbot.core import commands
 
-    class Mycog(commands.Cog):
+    class MyCog(commands.Cog):
         """My custom cog"""
+
+        def __init__(self, bot):
+            self.bot = bot
 
         @commands.command()
         async def mycom(self, ctx):
@@ -83,10 +99,11 @@ Open :code:`__init__.py`. In that file, place the following:
 
 .. code-block:: python
 
-    from .mycog import Mycog
+    from .mycog import MyCog
 
-    def setup(bot):
-        bot.add_cog(Mycog())
+
+    async def setup(bot):
+        await bot.add_cog(MyCog(bot))
 
 Make sure that both files are saved.
 
@@ -135,6 +152,18 @@ have successfully created a cog!
     to load them
     
     You can also take a look at `our cookiecutter <https://github.com/Cog-Creators/cog-cookiecutter>`_, for help creating the right structure.
+
+-------------------
+Publishing your cog
+-------------------
+
+Go to :doc:`/guide_publish_cogs`
+
+--------------------------------
+Becoming an Approved Cog Creator
+--------------------------------
+
+:doc:`/guide_cog_creators` explains the Cog Creator Application process and lists requirements and good practices for Cog Creators.  This information is worth following for anyone creating cogs for Red, regardless of if you plan to publish your cogs or not.
 
 --------------------
 Additional resources

@@ -4,36 +4,51 @@
 Setting up auto-restart using systemd on Linux
 ==============================================
 
+.. note:: This guide is for setting up systemd on a Linux environment. This guide assumes that you already have a working Red instance.
+
 -------------------------
 Creating the service file
 -------------------------
 
-In order to create the service file, you will first need the location of your :code:`redbot` binary.
+In order to create the service file, you will first need to know two things, your Linux :code:`username` and your Python :code:`path`
 
-.. code-block:: bash
+First, your Linux :code:`username` can be fetched with the following command:
 
-    # If redbot is installed in a virtualenv
-    source redenv/bin/activate
+.. prompt:: bash
 
-    # If you are using pyenv
-    pyenv shell <name>
+    whoami
 
-    which redbot
+Next, your python :code:`path` can be fetched with the following commands:
+
+.. prompt:: bash
+    :prompts: $,(redenv) $
+    :modifiers: auto
+
+    # If redbot is installed in a venv
+    $ source ~/redenv/bin/activate
+    (redenv) $ which python
+
+    # If redbot is installed in a pyenv virtualenv
+    $ pyenv shell <virtualenv_name>
+    (redenv) $ pyenv which python
 
 Then create the new service file:
 
-:code:`sudo -e /etc/systemd/system/red@.service`
+:code:`sudo nano /etc/systemd/system/red@.service`
 
-Paste the following and replace all instances of :code:`username` with the username, and :code:`path` with the location you obtained above:
+Paste the following in the file, and replace all instances of :code:`username` with the Linux username you retrieved above, and :code:`path` with the python path you retrieved above.
 
 .. code-block:: none
+    :emphasize-lines: 8-10
 
     [Unit]
     Description=%I redbot
     After=multi-user.target
+    After=network-online.target
+    Wants=network-online.target
 
     [Service]
-    ExecStart=path %I --no-prompt
+    ExecStart=path -O -m redbot %I --no-prompt
     User=username
     Group=username
     Type=idle
@@ -55,20 +70,34 @@ Starting and enabling the service
 
 To start the bot, run the service and add the instance name after the **@**:
 
-:code:`sudo systemctl start red@instancename`
+.. prompt:: bash
+
+    sudo systemctl start red@instancename
 
 To set the bot to start on boot, you must enable the service, again adding the instance name after the **@**:
 
-:code:`sudo systemctl enable red@instancename`
+.. prompt:: bash
+
+    sudo systemctl enable red@instancename
 
 If you need to shutdown the bot, you can use the ``[p]shutdown`` command or
 type the following command in the terminal, still by adding the instance name after the **@**:
 
-:code:`sudo systemctl stop red@instancename`
+.. prompt:: bash
+
+    sudo systemctl stop red@instancename
 
 .. warning:: If the service doesn't stop in the next 10 seconds, the process is killed.
     Check your logs to know the cause of the error that prevents the shutdown.
 
-To view Red’s log, you can acccess through journalctl:
+To set the bot to not start on boot anymore, you must disable the service by running the following command, adding the instance name after the **@**:
 
-:code:`sudo journalctl -u red@instancename`
+.. prompt:: bash
+
+    sudo systemctl disable red@instancename
+
+You can access Red's log through journalctl:
+
+.. prompt:: bash
+
+    sudo journalctl -eu red@instancename

@@ -1,4 +1,3 @@
-import asyncio as _asyncio
 import re as _re
 import sys as _sys
 import warnings as _warnings
@@ -13,8 +12,10 @@ from typing import (
     Union as _Union,
 )
 
+from redbot._version import _get_version
 
-MIN_PYTHON_VERSION = (3, 7, 0)
+
+MIN_PYTHON_VERSION = (3, 8, 1)
 
 __all__ = [
     "MIN_PYTHON_VERSION",
@@ -43,6 +44,7 @@ class VersionInfo:
         r"(?:(?P<releaselevel>a|b|rc)(?P<serial>0|[1-9]\d*))?"
         r"(?:\.post(?P<post_release>0|[1-9]\d*))?"
         r"(?:\.dev(?P<dev_release>0|[1-9]\d*))?"
+        r"(?:\+(?P<local_version>g[a-z0-9]+(?:\.dirty)?))?"
         r"$",
         flags=_re.IGNORECASE,
     )
@@ -62,6 +64,7 @@ class VersionInfo:
         serial: _Optional[int] = None,
         post_release: _Optional[int] = None,
         dev_release: _Optional[int] = None,
+        local_version: _Optional[str] = None,
     ) -> None:
         self.major: int = major
         self.minor: int = minor
@@ -74,6 +77,17 @@ class VersionInfo:
         self.serial: _Optional[int] = serial
         self.post_release: _Optional[int] = post_release
         self.dev_release: _Optional[int] = dev_release
+        self.local_version: _Optional[str] = local_version
+
+    @property
+    def short_commit_hash(self) -> _Optional[str]:
+        if self.local_version is None:
+            return None
+        return self.local_version[1:].split(".", 1)[0]
+
+    @property
+    def dirty(self) -> bool:
+        return self.local_version is not None and self.local_version.endswith(".dirty")
 
     @classmethod
     def from_str(cls, version_str: str) -> "VersionInfo":
@@ -100,6 +114,7 @@ class VersionInfo:
         for key in ("serial", "post_release", "dev_release"):
             if match[key] is not None:
                 kwargs[key] = int(match[key])
+        kwargs["local_version"] = match["local_version"]
         return cls(**kwargs)
 
     @classmethod
@@ -122,15 +137,18 @@ class VersionInfo:
             "serial": self.serial,
             "post_release": self.post_release,
             "dev_release": self.dev_release,
+            "local_version": self.local_version,
         }
 
     def _generate_comparison_tuples(
         self, other: "VersionInfo"
     ) -> _List[
-        _Tuple[int, int, int, int, _Union[int, float], _Union[int, float], _Union[int, float]]
+        _Tuple[int, int, int, int, _Union[int, float], _Union[int, float], _Union[int, float], int]
     ]:
         tups: _List[
-            _Tuple[int, int, int, int, _Union[int, float], _Union[int, float], _Union[int, float]]
+            _Tuple[
+                int, int, int, int, _Union[int, float], _Union[int, float], _Union[int, float], int
+            ]
         ] = []
         for obj in (self, other):
             tups.append(
@@ -142,6 +160,7 @@ class VersionInfo:
                     obj.serial if obj.serial is not None else _inf,
                     obj.post_release if obj.post_release is not None else -_inf,
                     obj.dev_release if obj.dev_release is not None else _inf,
+                    int(obj.dirty),
                 )
             )
         return tups
@@ -169,31 +188,83 @@ class VersionInfo:
             ret += f".post{self.post_release}"
         if self.dev_release is not None:
             ret += f".dev{self.dev_release}"
+        if self.local_version is not None:
+            ret += f"+{self.local_version}"
         return ret
 
     def __repr__(self) -> str:
         return (
             "VersionInfo(major={major}, minor={minor}, micro={micro}, "
             "releaselevel={releaselevel}, serial={serial}, post={post_release}, "
-            "dev={dev_release})".format(**self.to_json())
-        )
+            "dev={dev_release}, local={local_version})"
+        ).format(**self.to_json())
 
 
 def _update_event_loop_policy():
-    if _sys.platform == "win32":
-        _asyncio.set_event_loop_policy(_asyncio.WindowsProactorEventLoopPolicy())
-    elif _sys.implementation.name == "cpython":
+    if _sys.implementation.name == "cpython":
         # Let's not force this dependency, uvloop is much faster on cpython
         try:
-            import uvloop as _uvloop
+            import uvloop
         except ImportError:
             pass
         else:
-            _asyncio.set_event_loop_policy(_uvloop.EventLoopPolicy())
+            import asyncio
+
+            asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
-__version__ = "3.1.7"
+def _ensure_no_colorama():
+    # a hacky way to ensure that nothing initialises colorama
+    # if we're not running with legacy Windows command line mode
+    from rich.console import detect_legacy_windows
+
+    if not detect_legacy_windows():
+        import colorama
+        import colorama.initialise
+
+        colorama.deinit()
+
+        def _colorama_wrap_stream(stream, *args, **kwargs):
+            return stream
+
+        colorama.wrap_stream = _colorama_wrap_stream
+        colorama.initialise.wrap_stream = _colorama_wrap_stream
+
+
+def _update_logger_class():
+    from red_commons.logging import maybe_update_logger_class
+
+    maybe_update_logger_class()
+
+
+def _early_init():
+    # This function replaces logger so we preferrably (though not necessarily) want that to happen
+    # before importing anything that calls `logging.getLogger()`, i.e. `asyncio`.
+    _update_logger_class()
+    _update_event_loop_policy()
+    _ensure_no_colorama()
+
+
+__version__ = _get_version()
 version_info = VersionInfo.from_str(__version__)
 
 # Filter fuzzywuzzy slow sequence matcher warning
 _warnings.filterwarnings("ignore", module=r"fuzzywuzzy.*")
+# Show DeprecationWarning
+_warnings.filterwarnings("default", category=DeprecationWarning)
+
+# TODO: Rearrange cli flags here and use the value instead of this monkeypatch
+if not any(_re.match("^-(-debug|d+|-verbose|v+)$", i) for i in _sys.argv):
+    # DEP-WARN
+    # Individual warnings - tracked in https://github.com/Cog-Creators/Red-DiscordBot/issues/3529
+    # DeprecationWarning: an integer is required (got type float).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.
+    _warnings.filterwarnings("ignore", category=DeprecationWarning, module="importlib", lineno=219)
+    # DeprecationWarning: The loop argument is deprecated since Python 3.8, and scheduled for removal in Python 3.10
+    #   stdin, stdout, stderr = await tasks.gather(stdin, stdout, stderr,
+    # this is a bug in CPython
+    _warnings.filterwarnings(
+        "ignore",
+        category=DeprecationWarning,
+        module="asyncio",
+        message="The loop argument is deprecated since Python 3.8",
+    )

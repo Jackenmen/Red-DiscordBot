@@ -2,15 +2,27 @@ import abc
 import enum
 from typing import Tuple, Dict, Any, Union, List, AsyncIterator, Type
 
+import rich.progress
+
+from redbot.core.utils._internal_utils import RichIndefiniteBarColumn
+
 __all__ = ["BaseDriver", "IdentifierData", "ConfigCategory"]
 
 
 class ConfigCategory(str, enum.Enum):
+    """Represents config category."""
+
+    #: Global category.
     GLOBAL = "GLOBAL"
+    #: Guild category.
     GUILD = "GUILD"
+    #: Channel category.
     CHANNEL = "TEXTCHANNEL"
+    #: Role category.
     ROLE = "ROLE"
+    #: User category.
     USER = "USER"
+    #: Member category.
     MEMBER = "MEMBER"
 
     @classmethod
@@ -100,6 +112,28 @@ class IdentifierData:
 
     def __hash__(self) -> int:
         return hash((self.uuid, self.category, self.primary_key, self.identifiers))
+
+    def get_child(self, *keys: str) -> "IdentifierData":
+        if not all(isinstance(i, str) for i in keys):
+            raise ValueError("Identifiers must be strings.")
+
+        primary_keys = self.primary_key
+        identifiers = self.identifiers
+        num_missing_pkeys = self.primary_key_len - len(self.primary_key)
+        if num_missing_pkeys > 0:
+            primary_keys += keys[:num_missing_pkeys]
+        if len(keys) > num_missing_pkeys:
+            identifiers += keys[num_missing_pkeys:]
+
+        return IdentifierData(
+            self.cog_name,
+            self.uuid,
+            self.category,
+            primary_keys,
+            identifiers,
+            self.primary_key_len,
+            self.is_custom,
+        )
 
     def add_identifier(self, *identifier: str) -> "IdentifierData":
         if not all(isinstance(i, str) for i in identifier):
@@ -250,12 +284,28 @@ class BaseDriver(abc.ABC):
 
         """
         # Backend-agnostic method of migrating from one driver to another.
-        async for cog_name, cog_id in cls.aiter_cogs():
-            this_driver = cls(cog_name, cog_id)
-            other_driver = new_driver_cls(cog_name, cog_id)
-            custom_group_data = all_custom_group_data.get(cog_name, {}).get(cog_id, {})
-            exported_data = await this_driver.export_data(custom_group_data)
-            await other_driver.import_data(exported_data, custom_group_data)
+        with rich.progress.Progress(
+            rich.progress.SpinnerColumn(),
+            rich.progress.TextColumn("[progress.description]{task.description}"),
+            RichIndefiniteBarColumn(),
+            rich.progress.TextColumn("{task.completed} cogs processed"),
+            rich.progress.TimeElapsedColumn(),
+        ) as progress:
+            cog_count = 0
+            tid = progress.add_task("[yellow]Migrating", completed=cog_count, total=cog_count + 1)
+            async for cog_name, cog_id in cls.aiter_cogs():
+                progress.console.print(f"Working on {cog_name}...")
+
+                this_driver = cls(cog_name, cog_id)
+                other_driver = new_driver_cls(cog_name, cog_id)
+                custom_group_data = all_custom_group_data.get(cog_name, {}).get(cog_id, {})
+                exported_data = await this_driver.export_data(custom_group_data)
+                await other_driver.import_data(exported_data, custom_group_data)
+
+                cog_count += 1
+                progress.update(tid, completed=cog_count, total=cog_count + 1)
+            progress.update(tid, total=cog_count)
+        print()
 
     @classmethod
     async def delete_all_data(cls, **kwargs) -> None:
@@ -263,7 +313,7 @@ class BaseDriver(abc.ABC):
 
         The driver must be initialized before this operation.
 
-        The BaseDriver provides a generic method which may be overriden
+        The BaseDriver provides a generic method which may be overridden
         by subclasses.
 
         Parameters
