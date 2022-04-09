@@ -51,6 +51,11 @@ jobs:
           env:
             TOXENV: ${{ matrix.tox_env }}
           run: tox
+        - uses: actions/upload-artifact@v3
+          if: failure()
+          with:
+            name: my-artifact.zip
+            path: .tox/**/log/*
 
     tox-postgres:
       runs-on: ubuntu-latest
