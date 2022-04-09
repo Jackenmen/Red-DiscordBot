@@ -126,13 +126,6 @@ test = [
     "toml==0.10.2",
     "wrapt==1.12.1",
 ]
-all = ["%(postgres)s"]
-dev = [
-    "%(all)s",
-    "%(docs)s",
-    "%(style)s",
-    "%(test)s",
-]
 
 [project.entry-points]
 pytest11 = {red-discordbot = "redbot.pytest"}
