@@ -33,7 +33,7 @@ import aiohttp
 import discord
 import pkg_resources
 from discord.ext.commands.converter import get_converter  # DEP-WARN
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 from rich.progress import ProgressColumn
 from rich.progress_bar import ProgressBar
 from red_commons.logging import VERBOSE, TRACE
@@ -162,7 +162,7 @@ async def fuzzy_command_search(
 
     # Filter through the fuzzy-matched commands.
     matched_commands = []
-    for command, score in extracted:
+    for command, score, __ in extracted:
         if score < min_score:
             # Since the list is in decreasing order of score, we can exit early.
             break
