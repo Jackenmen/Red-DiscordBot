@@ -12,15 +12,8 @@ Installing Red on Ubuntu 20.04 LTS
 Installing the pre-requirements
 -------------------------------
 
-We recommend adding the ``git-core`` ppa to install Git 2.11 or greater:
-
-.. prompt:: bash
-
-    sudo apt update
-    sudo apt -y install software-properties-common
-    sudo add-apt-repository -y ppa:git-core/ppa
-
-Now install the pre-requirements with apt:
+Ubuntu 20.04 LTS has all required packages available in official repositories. Install them
+with apt:
 
 .. prompt:: bash
 
@@ -28,6 +21,6 @@ Now install the pre-requirements with apt:
 
 .. Include common instructions:
 
-.. include:: _includes/create-env-with-venv.rst
+.. include:: _includes/create-env-with-venv3.9.rst
 
 .. include:: _includes/install-and-setup-red-unix.rst
