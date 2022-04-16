@@ -8,7 +8,7 @@ import aiohttp
 import discord
 from redbot.core import commands
 from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.menus import menu, DEFAULT_CONTROLS
+from redbot.core.utils.menus import menu
 from redbot.core.utils.chat_formatting import (
     bold,
     escape,
@@ -505,7 +505,6 @@ class General(commands.Cog):
                     await menu(
                         ctx,
                         pages=embeds,
-                        controls=DEFAULT_CONTROLS,
                         message=None,
                         page=0,
                         timeout=30,
@@ -531,7 +530,6 @@ class General(commands.Cog):
                     await menu(
                         ctx,
                         pages=messages,
-                        controls=DEFAULT_CONTROLS,
                         message=None,
                         page=0,
                         timeout=30,
