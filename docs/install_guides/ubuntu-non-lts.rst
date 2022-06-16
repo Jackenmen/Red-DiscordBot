@@ -16,6 +16,7 @@ Now install the pre-requirements with apt:
 
 .. prompt:: bash
 
+    sudo apt update
     sudo apt -y install python3.10 python3.10-dev python3.10-venv python3-pip git openjdk-11-jre-headless build-essential nano
 
 .. Include common instructions:
