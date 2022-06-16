@@ -20,6 +20,6 @@ Install the pre-requirements with pacman:
 
 .. Include common instructions:
 
-.. include:: _includes/create-env-with-venv.rst
+.. include:: _includes/create-env-with-venv3.10.rst
 
 .. include:: _includes/install-and-setup-red-unix.rst
