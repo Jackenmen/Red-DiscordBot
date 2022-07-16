@@ -34,6 +34,13 @@ class Events(MixinMeta):
         guild_cache[author].append(message.content)
         msgs = guild_cache[author]
         if len(msgs) == msgs.maxlen and len(set(msgs)) == 1:
+            if message.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+                log.error(
+                    "Message deletion has been attempted in a guild (%s) with 2FA requirement,"
+                    " but the bot owner doesn't have 2FA enabled.",
+                    message.guild.id,
+                )
+                return False
             try:
                 await message.delete()
                 return True
@@ -49,6 +56,14 @@ class Events(MixinMeta):
             mentions = message.raw_mentions
         else:  # if not enabled
             mentions = set(message.mentions)
+
+        if message.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.warning(
+                "Ignoring mention spam checks in a guild (%s) with 2FA requirement,"
+                " because the bot owner doesn't have 2FA enabled.",
+                message.guild.id,
+            )
+            return False
 
         if mention_spam["ban"]:
             if len(mentions) >= mention_spam["ban"]:

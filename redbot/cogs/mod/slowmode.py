@@ -1,3 +1,4 @@
+import logging
 import re
 from .abc import MixinMeta
 from datetime import timedelta
@@ -5,6 +6,7 @@ from redbot.core import commands, i18n, checks
 from redbot.core.utils.chat_formatting import humanize_timedelta
 
 _ = i18n.Translator("Mod", __file__)
+log = logging.getLogger("red.mod")
 
 
 class Slowmode(MixinMeta):
@@ -29,6 +31,14 @@ class Slowmode(MixinMeta):
         Interval can be anything from 0 seconds to 6 hours.
         Use without parameters to disable.
         """
+        if ctx.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Slowmode change has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                ctx.guild.id,
+            )
+            await ctx.send(_("An unexpected error occurred."))
+            return
         seconds = interval.total_seconds()
         await ctx.channel.edit(slowmode_delay=seconds)
         if seconds > 0:

@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import cast
 
 import discord
@@ -13,6 +14,7 @@ from .abc import MixinMeta
 from .utils import is_allowed_by_hierarchy
 
 _ = i18n.Translator("Mod", __file__)
+log = logging.getLogger("red.mod")
 
 
 class ModInfo(MixinMeta):
@@ -67,6 +69,14 @@ class ModInfo(MixinMeta):
                 )
             )
         else:
+            if ctx.guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+                log.error(
+                    "Nickname change has been attempted in a guild (%s) with 2FA requirement,"
+                    " but the bot owner doesn't have 2FA enabled.",
+                    ctx.guild.id,
+                )
+                await ctx.send(_("An unexpected error has occurred."))
+                return
             try:
                 await member.edit(reason=get_audit_reason(ctx.author, None), nick=nickname)
             except discord.Forbidden:
@@ -76,7 +86,7 @@ class ModInfo(MixinMeta):
                 if exc.status == 400:  # BAD REQUEST
                     await ctx.send(_("That nickname is invalid."))
                 else:
-                    await ctx.send(_("An unexpected error has occured."))
+                    await ctx.send(_("An unexpected error has occurred."))
             else:
                 await ctx.send(_("Done."))
 

@@ -120,6 +120,14 @@ class KickBanMixin(MixinMeta):
         if not (0 <= days <= 7):
             return False, _("Invalid days. Must be between 0 and 7.")
 
+        if guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Ban has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            return False, _("An unexpected error occurred.")
+
         if isinstance(user, discord.Member):
             if author == user:
                 return (
@@ -317,6 +325,14 @@ class KickBanMixin(MixinMeta):
         elif ctx.guild.me.top_role <= member.top_role or member == ctx.guild.owner:
             await ctx.send(_("I cannot do that due to Discord hierarchy rules."))
             return
+        elif guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Kick has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            await ctx.send(_("Unexpected error occurred."))
+            return
         audit_reason = get_audit_reason(author, reason, shorten=True)
         toggle = await self.config.guild(guild).dm_on_kickban()
         if toggle:
@@ -342,6 +358,7 @@ class KickBanMixin(MixinMeta):
                     author.name, author.id, member.name, member.id
                 )
             )
+            await ctx.send(_("Unexpected error occurred."))
         else:
             await modlog.create_case(
                 self.bot,
@@ -447,6 +464,15 @@ class KickBanMixin(MixinMeta):
 
         if not user_ids:
             await ctx.send_help()
+            return
+
+        if guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Hackban has been attempted in a guild (%s) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            await ctx.send(_("An unexpected error occurred."))
             return
 
         if days is None:
@@ -612,6 +638,14 @@ class KickBanMixin(MixinMeta):
         elif guild.me.top_role <= member.top_role or member == guild.owner:
             await ctx.send(_("I cannot do that due to Discord hierarchy rules."))
             return
+        elif guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Tempban has been attempted in a guild ({}) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            await ctx.send(_("Something went wrong while banning."))
+            return
 
         guild_data = await self.config.guild(guild).all()
 
@@ -690,6 +724,14 @@ class KickBanMixin(MixinMeta):
                 )
             )
             return
+        elif guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Softban has been attempted in a guild ({}) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            await ctx.send(_("Something went wrong while banning."))
+            return
 
         audit_reason = get_audit_reason(author, reason, shorten=True)
 
@@ -718,6 +760,7 @@ class KickBanMixin(MixinMeta):
                     author.name, author.id, member.name, member.id
                 )
             )
+            await ctx.send(_("Something went wrong while banning."))
             return
         try:
             await guild.unban(member)
@@ -727,6 +770,7 @@ class KickBanMixin(MixinMeta):
                     author.name, author.id, member.name, member.id
                 )
             )
+            await ctx.send(_("Something went wrong while unbanning."))
             return
         else:
             log.info(
@@ -892,6 +936,16 @@ class KickBanMixin(MixinMeta):
         click the user and select 'Copy ID'."""
         guild = ctx.guild
         author = ctx.author
+
+        if guild.mfa_level == 1 and not self.bot.user.mfa_enabled:
+            log.error(
+                "Unban has been attempted in a guild ({}) with 2FA requirement,"
+                " but the bot owner doesn't have 2FA enabled.",
+                guild.id,
+            )
+            await ctx.send(_("Something went wrong while attempting to unban that user."))
+            return
+
         audit_reason = get_audit_reason(ctx.author, reason, shorten=True)
         try:
             ban_entry = await guild.fetch_ban(discord.Object(user_id))
