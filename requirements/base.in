@@ -1,0 +1,20 @@
+aiohttp
+aiohttp-json-rpc
+apsw-wheels
+babel
+click
+discord.py @ https://github.com/Rapptz/discord.py/archive/3d914e08e0c7df370987592affb3655d2a12f7d1.zip
+distro; sys_platform == "linux"
+markdown
+platformdirs
+psutil
+python-dateutil
+PyYAML
+rapidfuzz
+Red-Commons
+Red-Lavalink
+rich
+schema
+typing_extensions
+uvloop; sys_platform != "win32" and platform_python_implementation == "CPython"
+yarl
