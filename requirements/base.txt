@@ -1,36 +1,36 @@
-aiohttp==3.8.1
+aiohttp==3.7.4.post0
 aiohttp-json-rpc==0.13.3
-aiosignal==1.2.0
+aiosqlite==0.17.0
+appdirs==1.4.4
 apsw-wheels==3.36.0.post1
-async-timeout==4.0.2
-attrs==21.4.0
-babel==2.10.3
-charset-normalizer==2.1.0
-click==8.1.3
+async-timeout==3.0.1
+attrs==21.2.0
+babel==2.9.1
+cffi==1.14.6
+chardet==4.0.0
+click==8.0.1
+colorama==0.4.4
 commonmark==0.9.1
 contextlib2==21.6.0
-discord.py@ https://github.com/Rapptz/discord.py/archive/3d914e08e0c7df370987592affb3655d2a12f7d1.zip
-frozenlist==1.3.0
-idna==3.3
-importlib-metadata==4.12.0
-jarowinkler==1.2.0
-markdown==3.4.1
-multidict==6.0.2
-platformdirs==2.5.2
-psutil==5.9.1
-pygments==2.12.0
+discord.py @ git+https://github.com/Rapptz/discord.py@3d914e08e0c7df370987592affb3655d2a12f7d1#egg=discord.py
+fuzzywuzzy==0.18.0
+idna==3.2
+markdown==3.3.4
+multidict==5.1.0
+psutil==5.8.0
+pycparser==2.20
+pygments==2.10.0
+pynacl==1.4.0
 python-dateutil==2.8.2
-pytz==2022.1
-pyyaml==6.0
-rapidfuzz==2.2.0
+python-Levenshtein-wheels==0.13.2
+pytz==2021.1
+pyyaml==5.4.1
 red-commons==1.0.0
-red-lavalink==0.10.0
-rich==12.5.1
-schema==0.7.5
+red-lavalink==0.11.0rc0
+rich==10.9.0
+schema==0.7.4
 six==1.16.0
-typing-extensions==4.3.0
-yarl==1.7.2
-zipp==3.8.1
-colorama==0.4.5; sys_platform == "win32"
-distro==1.7.0; sys_platform == "linux"
-uvloop==0.16.0; platform_python_implementation == "CPython" and sys_platform != "win32"
+typing-extensions==3.10.0.2
+yarl==1.6.3
+distro==1.6.0; sys_platform == "linux"
+uvloop==0.16.0; sys_platform != "win32" and platform_python_implementation == "CPython"
