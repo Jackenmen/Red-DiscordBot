@@ -19,22 +19,28 @@ jobs:
           tox_env:
             - style
             - docs
+          env:
+            - {}
           include:
             - tox_env: py38
               python_version: "3.8"
               friendly_name: Python 3.8 - Tests
+              env: {}
             - tox_env: py39
               python_version: "3.9"
               friendly_name: Python 3.9 - Tests
+              env: {}
             - tox_env: py310
               python_version: "3.10"
               friendly_name: Python 3.10 - Tests
+              env: {}
             - tox_env: style
               friendly_name: Style
             - tox_env: docs
               friendly_name: Docs
         fail-fast: false
       name: Tox - ${{ matrix.friendly_name }}
+      env: ${{ matrix.env }}
       steps:
         - uses: actions/checkout@v3
           with:
@@ -60,8 +66,11 @@ jobs:
             - "3.8"
             - "3.9"
             - "3.10"
+          env:
+            - {}
         fail-fast: false
       name: Tox - Postgres
+      env: ${{ matrix.env }}
       services:
         postgresql:
           image: postgres:10
