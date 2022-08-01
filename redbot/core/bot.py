@@ -13,7 +13,6 @@ import types
 from collections import namedtuple, OrderedDict
 from datetime import datetime
 from enum import IntEnum
-from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import (
     Optional,

@@ -22,16 +22,15 @@ This is so users who wish to modify core cogs can do so by copying or
 installing cogs into a user-defined/core path, and this modified one
 will be loaded instead.
 """
-import asyncio
-import contextlib
-import importlib.machinery
+
+import importlib
 import keyword
 import logging
 import pkgutil
 import sys
 import types
 from pathlib import Path
-from typing import Union, List, Optional, Set
+from typing import Union, List, Set
 
 import redbot.cogs
 import redbot.ext_cogs
