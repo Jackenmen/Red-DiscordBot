@@ -8,10 +8,10 @@ import sys
 import contextlib
 import weakref
 import functools
+import types
 from collections import namedtuple, OrderedDict
 from datetime import datetime
 from enum import IntEnum
-from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import (
     Optional,
@@ -37,7 +37,7 @@ from discord.ext import commands as dpy_commands
 from discord.ext.commands import when_mentioned_or
 
 from . import Config, i18n, commands, errors, drivers, modlog, bank
-from .cog_manager import CogManager, CogManagerUI
+from ._cog_manager import CogManager, CogManagerUI, NoSuchCog
 from .core_commands import Core
 from .data_manager import cog_data_path
 from .dev_commands import Dev
@@ -1081,6 +1081,7 @@ class Red(
         This should only be run once, prior to logging in to Discord REST API.
         """
         await self._maybe_update_config()
+        await self._cog_mgr.initialize()
         self.description = await self._config.description()
         self._color = discord.Colour(await self._config.color())
 
@@ -1180,16 +1181,14 @@ class Red(
             log.info("Loading packages...")
             for package in packages:
                 try:
-                    spec = await self._cog_mgr.find_cog(package)
-                    if spec is None:
-                        log.error(
-                            "Failed to load package %s (package was not found in any cog path)",
-                            package,
-                        )
-                        await self.remove_loaded_package(package)
-                        to_remove.append(package)
-                        continue
-                    await asyncio.wait_for(self.load_extension(spec), 30)
+                    await asyncio.wait_for(self.load_extension(package), 30)
+                except NoSuchCog:
+                    log.error(
+                        "Failed to load package %s (package was not found in any cog path)",
+                        package,
+                    )
+                    await self.remove_loaded_package(package)
+                    to_remove.append(package)
                 except asyncio.TimeoutError:
                     log.exception("Failed to load package %s (timeout)", package)
                     to_remove.append(package)
@@ -1588,25 +1587,30 @@ class Red(
             while pkg_name in curr_pkgs:
                 curr_pkgs.remove(pkg_name)
 
-    async def load_extension(self, spec: ModuleSpec):
+    async def load_extension(self, module: Union[str, types.ModuleType]) -> None:
         # NB: this completely bypasses `discord.ext.commands.Bot._load_from_module_spec`
-        name = spec.name.split(".")[-1]
-        if name in self.extensions:
-            raise errors.PackageAlreadyLoaded(spec)
+        if isinstance(module, str):
+            module: types.ModuleType = self._cog_mgr.load_cog_module(module)
+        name = module.__name__
+        if name.startswith("redbot.cogs."):
+            name = name[len("redbot.cogs.") :]
 
-        lib = spec.loader.load_module()
-        if not hasattr(lib, "setup"):
-            del lib
-            raise discord.ClientException(f"extension {name} does not have a setup function")
+        if name in self.extensions:
+            raise errors.PackageAlreadyLoaded(name)
 
         try:
-            await lib.setup(self)
-        except Exception as e:
-            await self._remove_module_references(lib.__name__)
-            await self._call_module_finalizers(lib, name)
-            raise
+            setup = getattr(module, "setup")
+        except AttributeError:
+            raise discord.ClientException(f"extension {name} does not have a setup function")
         else:
-            self._BotBase__extensions[name] = lib
+            try:
+                await setup(self)
+            except Exception:
+                await self._remove_module_references(module.__name__)
+                await self._call_module_finalizers(module, name)
+                raise
+            else:
+                self._BotBase__extensions[name] = module
 
     async def remove_cog(
         self,

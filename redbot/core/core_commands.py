@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import datetime
-import importlib
 import itertools
 import keyword
 import logging
@@ -16,6 +15,7 @@ import psutil
 import getpass
 import pip
 import traceback
+import types
 from pathlib import Path
 from redbot.core import data_manager
 from redbot.core.utils.menus import menu
@@ -39,6 +39,7 @@ from . import (
     bank,
     modlog,
 )
+from ._cog_manager import NoSuchCog
 from ._diagnoser import IssueDiagnoser
 from .utils import AsyncIter, can_user_send_messages_in
 from .utils._internal_utils import fetch_latest_red_version_info
@@ -149,18 +150,16 @@ class CoreLogic:
 
         bot = self.bot
 
-        pkg_specs = []
+        cog_modules: List[Tuple[str, types.ModuleType]] = []
 
         for name in pkg_names:
             if not name.isidentifier() or keyword.iskeyword(name):
                 invalid_pkg_names.append(name)
                 continue
             try:
-                spec = await bot._cog_mgr.find_cog(name)
-                if spec:
-                    pkg_specs.append((spec, name))
-                else:
-                    notfound_packages.append(name)
+                module = bot._cog_mgr.load_cog_module(name)
+            except NoSuchCog:
+                notfound_packages.append(name)
             except Exception as e:
                 log.exception("Package import failed", exc_info=e)
 
@@ -168,11 +167,13 @@ class CoreLogic:
                 exception_log += "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 bot._last_exception = exception_log
                 failed_packages.append(name)
+            else:
+                cog_modules.append((name, module))
 
-        async for spec, name in AsyncIter(pkg_specs, steps=10):
+        async for name, module in AsyncIter(cog_modules, steps=10):
             try:
-                self._cleanup_and_refresh_modules(spec.name)
-                await bot.load_extension(spec)
+                module = bot._cog_mgr.reload(module)
+                await bot.load_extension(module)
             except errors.PackageAlreadyLoaded:
                 alreadyloaded_packages.append(name)
             except errors.CogLoadError as e:
@@ -225,32 +226,6 @@ class CoreLogic:
             "failed_with_reason_packages": failed_with_reason_packages,
             "repos_with_shared_libs": list(repos_with_shared_libs),
         }
-
-    @staticmethod
-    def _cleanup_and_refresh_modules(module_name: str) -> None:
-        """Internally reloads modules so that changes are detected."""
-        splitted = module_name.split(".")
-
-        def maybe_reload(new_name):
-            try:
-                lib = sys.modules[new_name]
-            except KeyError:
-                pass
-            else:
-                importlib._bootstrap._exec(lib.__spec__, lib)
-
-        # noinspection PyTypeChecker
-        modules = itertools.accumulate(splitted, "{}.{}".format)
-        for m in modules:
-            maybe_reload(m)
-
-        children = {
-            name: lib
-            for name, lib in sys.modules.items()
-            if name == module_name or name.startswith(f"{module_name}.")
-        }
-        for child_name, lib in children.items():
-            importlib._bootstrap._exec(lib.__spec__, lib)
 
     async def _unload(self, pkg_names: Iterable[str]) -> Dict[str, List[str]]:
         """
@@ -5080,13 +5055,9 @@ class Core(commands.commands._RuleDropper, commands.Cog, CoreLogic):
     async def rpc_load(self, request):
         cog_name = request.params[0]
 
-        spec = await self.bot._cog_mgr.find_cog(cog_name)
-        if spec is None:
-            raise LookupError("No such cog found.")
-
-        self._cleanup_and_refresh_modules(spec.name)
-
-        await self.bot.load_extension(spec)
+        module = self.bot._cog_mgr.load_cog_module(cog_name)
+        module = self.bot._cog_mgr.reload(module)
+        await self.bot.load_extension(module)
 
     async def rpc_unload(self, request):
         cog_name = request.params[0]
