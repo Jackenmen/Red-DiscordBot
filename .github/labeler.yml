@@ -43,7 +43,7 @@
   - docs/cog_guides/cog_manager_ui.rst
   - docs/cog_guides/core.rst
 "Category: CI":
-  - .github/workflows/*
+  - .github/workflows/**/*
 "Category: Cleanup Cog":
   # Source
   - redbot/cogs/cleanup/*
@@ -52,12 +52,14 @@
 "Category: Command Module":
   # Source
   - any:
-      # Source
       - redbot/core/commands/*
-      # Docs
+      - "!redbot/core/commands/help.py"
+  # Docs
+  - any:
       - docs/framework_checks.rst
+      - "!redbot/core/commands/help.py"
+  - any:
       - docs/framework_commands.rst
-    all:
       - "!redbot/core/commands/help.py"
 "Category: Config":
   # Source
@@ -110,7 +112,7 @@
   # Docs
   - docs/cog_guides/image.rst
 "Category: Meta":
-  - ./*
+  - '*'
   - .github/*
   - .github/ISSUE_TEMPLATE/*
   - .github/PULL_REQUEST_TEMPLATE/*
