@@ -234,14 +234,15 @@ class VersionInfo:
     @classmethod
     def _get_version_from_git_repo(cls, project_root: str) -> str:
         # we only want to do this for editable installs
-        if not _os.path.exists(_os.path.join(project_root, ".git")):
+        git_dir = _os.path.join(project_root, ".git")
+        if not _os.path.exists(git_dir):
             raise RuntimeError("not a git repository")
 
         import subprocess
 
         output = subprocess.check_output(
-            ("git", "describe", "--tags", "--long", "--dirty"),
-            stderr=subprocess.DEVNULL,
+            ("git", "--git-dir", git_dir, "describe", "--tags", "--long", "--dirty"),
+            # stderr=subprocess.DEVNULL,
             cwd=project_root,
         )
         _, count, commit, *dirty = output.decode("utf-8").strip().split("-", 3)
