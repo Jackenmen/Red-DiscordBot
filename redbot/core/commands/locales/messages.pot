@@ -1,0 +1,167 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2022-08-31 04:17+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: redgettext 3.4.2\n"
+
+#: redbot/core/commands/converter.py:83
+msgid "`{unit}` is not a valid unit of time for this command"
+msgstr ""
+
+#: redbot/core/commands/converter.py:139 redbot/core/commands/converter.py:201
+msgid "The time set is way too high, consider setting something reasonable."
+msgstr ""
+
+#: redbot/core/commands/converter.py:143
+msgid ""
+"This amount of time is too large for this command. (Maximum: {maximum})"
+msgstr ""
+
+#: redbot/core/commands/converter.py:149
+msgid ""
+"This amount of time is too small for this command. (Minimum: {minimum})"
+msgstr ""
+
+#: redbot/core/commands/converter.py:230
+msgid "'{input}' doesn't look like a valid user ID."
+msgstr ""
+
+#: redbot/core/commands/converter.py:257
+msgid "Missing a key or value."
+msgstr ""
+
+#: redbot/core/commands/converter.py:263
+msgid "Unexpected key `{key}`."
+msgstr ""
+
+#: redbot/core/commands/converter.py:488
+msgid "Command \"{arg}\" not found."
+msgstr ""
+
+#: redbot/core/commands/converter.py:498
+msgid "Cog \"{arg}\" not found."
+msgstr ""
+
+#: redbot/core/commands/help.py:114
+msgid "No"
+msgstr ""
+
+#: redbot/core/commands/help.py:116
+msgid "Yes"
+msgstr ""
+
+#: redbot/core/commands/help.py:122
+msgid "Disabled"
+msgstr ""
+
+#: redbot/core/commands/help.py:127
+msgid ""
+"\n"
+"Custom Tagline: {tag}"
+msgstr ""
+
+#: redbot/core/commands/help.py:133
+msgid ""
+"Maximum characters per page: {page_char_limit}\n"
+"Maximum pages per guild (only used if menus are not used): {max_pages_in_guild}\n"
+"Help is a menu: {use_menus}\n"
+"Help shows hidden commands: {show_hidden}\n"
+"Help shows commands aliases: {show_aliases}\n"
+"Help only shows commands which can be used: {verify_checks}\n"
+"Help shows unusable commands when asked directly: {verify_exists}\n"
+"Delete delay: {delete_delay}\n"
+"React with a checkmark when help is sent via DM: {use_tick}\n"
+"Reaction timeout (only used if menus are used): {react_timeout} seconds{tagline_info}"
+msgstr ""
+
+#: redbot/core/commands/help.py:284
+msgid ""
+"Type {command1} for more info on a command. You can also type {command2} for"
+" more info on a category."
+msgstr ""
+
+#: redbot/core/commands/help.py:330
+msgid "Syntax: {command_signature}"
+msgstr ""
+
+#: redbot/core/commands/help.py:336
+msgid "Aliases"
+msgstr ""
+
+#: redbot/core/commands/help.py:336
+msgid "Alias"
+msgstr ""
+
+#: redbot/core/commands/help.py:357
+msgid "{aliases} and {number} more aliases."
+msgstr ""
+
+#: redbot/core/commands/help.py:361
+msgid "{aliases} and one more alias."
+msgstr ""
+
+#: redbot/core/commands/help.py:403 redbot/core/commands/help.py:405
+#: redbot/core/commands/help.py:418
+msgid "Subcommands:"
+msgstr ""
+
+#: redbot/core/commands/help.py:405 redbot/core/commands/help.py:579
+msgid " (continued)"
+msgstr ""
+
+#: redbot/core/commands/help.py:480 redbot/core/commands/help.py:735
+#: redbot/core/commands/help.py:748 redbot/core/commands/help.py:767
+msgid "{ctx.me.display_name} Help Menu"
+msgstr ""
+
+#: redbot/core/commands/help.py:527
+msgid ""
+"*Page {page_num} of {page_count}*\n"
+"{content_description}"
+msgstr ""
+
+#: redbot/core/commands/help.py:577 redbot/core/commands/help.py:579
+#: redbot/core/commands/help.py:591
+msgid "Commands:"
+msgstr ""
+
+#: redbot/core/commands/help.py:630 redbot/core/commands/help.py:659
+#: redbot/core/commands/help.py:672
+msgid "No Category:"
+msgstr ""
+
+#: redbot/core/commands/help.py:643
+msgid "{title} (continued)"
+msgstr ""
+
+#: redbot/core/commands/help.py:744
+msgid "Help topic for {command_name} not found."
+msgstr ""
+
+#: redbot/core/commands/help.py:761
+msgid "Command {command_name} has no subcommand named {not_found}."
+msgstr ""
+
+#: redbot/core/commands/help.py:831
+msgid ""
+"I couldn't send the help message to you in DM. Either you blocked me or you "
+"disabled DMs in this server."
+msgstr ""
+
+#: redbot/core/commands/help.py:872
+#, docstring
+msgid ""
+"\n"
+"    I need somebody\n"
+"    (Help) not just anybody\n"
+"    (Help) you know I need someone\n"
+"    (Help!)\n"
+"    "
+msgstr ""
