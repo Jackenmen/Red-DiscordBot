@@ -254,6 +254,13 @@ msgid ""
 "content."
 msgstr ""
 
+#: redbot/cogs/audio/core/events/dpy.py:125
+msgid ""
+"This command toggles the support of Bandcamp audio playback. An example is "
+"<http://deaddiskdrive.bandcamp.com/track/crystal-glass>; Disabling this will"
+" make the bot unable to play any Bandcamp content"
+msgstr ""
+
 #: redbot/cogs/audio/core/events/dpy.py:130
 msgid ""
 "This command toggles the support of local track audio playback. for example "

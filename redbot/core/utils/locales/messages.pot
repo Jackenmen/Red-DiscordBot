@@ -96,3 +96,7 @@ msgstr ""
 #: redbot/core/utils/views.py:164
 msgid "This button is for bot owners only, oh well."
 msgstr ""
+
+#: redbot/core/utils/views.py:170
+msgid "Set API token"
+msgstr ""
