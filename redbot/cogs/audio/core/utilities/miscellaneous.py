@@ -378,7 +378,7 @@ class MiscellaneousUtilities(MixinMeta, metaclass=CompositeMetaClass):
 
         flags = (reader.read_int() & 0xC0000000) >> 30
         (version,) = (
-            struct.unpack("B", reader.read_byte()) if flags & 1 != 0 else 1
+            struct.unpack("B", reader.read_byte()) if flags & 1 != 0 else (1,)
         )  # pylint: disable=unused-variable
 
         title = reader.read_utf().decode(errors=decode_errors)
