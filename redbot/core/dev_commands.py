@@ -332,6 +332,7 @@ class Dev(commands.Cog):
         else:
             await ctx.send(_("The REPL session in this channel is now paused."))
 
+    @commands.guild_only()
     @commands.command()
     @checks.is_owner()
     async def mock(self, ctx, user: discord.Member, *, command):
@@ -345,6 +346,7 @@ class Dev(commands.Cog):
 
         ctx.bot.dispatch("message", msg)
 
+    @commands.guild_only()
     @commands.command(name="mockmsg")
     @checks.is_owner()
     async def mock_msg(self, ctx, user: discord.Member, *, content: str = ""):
