@@ -10,7 +10,6 @@ import weakref
 import functools
 from collections import namedtuple, OrderedDict
 from datetime import datetime
-from enum import IntEnum
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import (
@@ -37,6 +36,7 @@ from discord.ext import commands as dpy_commands
 from discord.ext.commands import when_mentioned_or
 
 from . import Config, i18n, commands, errors, drivers, modlog, bank
+from .cli import ExitCodes
 from .cog_manager import CogManager, CogManagerUI
 from .core_commands import Core
 from .data_manager import cog_data_path
@@ -60,7 +60,7 @@ SHARED_API_TOKENS = "SHARED_API_TOKENS"
 
 log = logging.getLogger("red")
 
-__all__ = ("Red", "ExitCodes")
+__all__ = ("Red",)
 
 NotMessage = namedtuple("NotMessage", "guild")
 
@@ -2035,11 +2035,3 @@ class Red(
             failed_cogs=failures["cog"],
             unhandled=failures["unhandled"],
         )
-
-
-class ExitCodes(IntEnum):
-    # This needs to be an int enum to be used
-    # with sys.exit
-    CRITICAL = 1
-    SHUTDOWN = 0
-    RESTART = 26
