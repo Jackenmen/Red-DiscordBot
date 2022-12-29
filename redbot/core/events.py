@@ -5,7 +5,7 @@ import sys
 import codecs
 import logging
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Tuple
 
 import aiohttp
@@ -308,10 +308,11 @@ def init_events(bot, cli_flags):
                 new_ctx = await bot.get_context(ctx.message)
                 await bot.invoke(new_ctx)
                 return
-            if delay := humanize_timedelta(seconds=error.retry_after):
-                msg = _("This command is on cooldown. Try again in {delay}.").format(delay=delay)
-            else:
-                msg = _("This command is on cooldown. Try again in 1 second.")
+            next_payday_dt = datetime.now(timezone.utc) + timedelta(seconds=error.retry_after)
+            relative_time = f"<t:{next_payday_dt}:R>"
+            msg = _("This command is on cooldown. Try again {relative_time}.").format(
+                relative_time=relative_time
+            )
             await ctx.send(msg, delete_after=error.retry_after)
         elif isinstance(error, commands.MaxConcurrencyReached):
             if error.per is commands.BucketType.default:
