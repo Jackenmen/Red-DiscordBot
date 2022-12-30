@@ -29,4 +29,5 @@ we recommend **Ubuntu 20.04 LTS**.
    rocky-linux-8
    ubuntu-1804
    ubuntu-2004
+   ubuntu-2204
    ubuntu-non-lts
