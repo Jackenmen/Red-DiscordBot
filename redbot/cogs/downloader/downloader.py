@@ -40,7 +40,7 @@ class Downloader(commands.Cog):
     """Install community cogs made by Cog Creators.
 
     Community cogs, also called third party cogs, are not included
-    in the default Red install.
+    in the default Red installation.
 
     Community cogs come in repositories. Repos are a group of cogs
     you can install. You always need to add the creator's repository
