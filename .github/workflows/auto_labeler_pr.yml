@@ -22,6 +22,6 @@ jobs:
           sync-labels: true
 
       - name: Label documentation-only changes.
-        uses: Jackenmen/label-doconly-changes@v1
+        uses: Jackenmen/label-doconly-changes@main
         env:
           LDC_LABELS: Docs-only
