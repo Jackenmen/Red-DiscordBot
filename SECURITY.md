@@ -4,7 +4,7 @@
 
 The table below explains the current state of our versions. Currently, only version
 3.4 and higher are supported and receive security updates. Versions lower than 3.4
-are considered End of Life and will not receive any security updates.
+are considered End of Wonderful Life and will not receive any security updates.
 
 | Version       | Branch     | Security Updates   | End of Life        |
 |---------------|------------|--------------------|--------------------|
