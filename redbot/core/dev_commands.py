@@ -24,7 +24,7 @@ from copy import copy
 
 import discord
 
-from . import checks, commands
+from . import commands
 from .commands import NoParseOptional as Optional
 from .i18n import Translator, cog_i18n
 from .utils.chat_formatting import pagify
@@ -122,7 +122,7 @@ class Dev(commands.Cog):
         return env
 
     @commands.command()
-    @checks.is_owner()
+    @commands.is_owner()
     async def debug(self, ctx, *, code):
         """Evaluate a statement of python code.
 
@@ -166,7 +166,7 @@ class Dev(commands.Cog):
         await ctx.send_interactive(self.get_pages(result), box_lang="py")
 
     @commands.command(name="eval")
-    @checks.is_owner()
+    @commands.is_owner()
     async def _eval(self, ctx, *, body: str):
         """Execute asynchronous code.
 
@@ -220,7 +220,7 @@ class Dev(commands.Cog):
         await ctx.send_interactive(self.get_pages(msg), box_lang="py")
 
     @commands.group(invoke_without_command=True)
-    @checks.is_owner()
+    @commands.is_owner()
     async def repl(self, ctx):
         """Open an interactive REPL.
 
@@ -334,7 +334,7 @@ class Dev(commands.Cog):
 
     @commands.guild_only()
     @commands.command()
-    @checks.is_owner()
+    @commands.is_owner()
     async def mock(self, ctx, user: discord.Member, *, command):
         """Mock another user invoking a command.
 
@@ -348,7 +348,7 @@ class Dev(commands.Cog):
 
     @commands.guild_only()
     @commands.command(name="mockmsg")
-    @checks.is_owner()
+    @commands.is_owner()
     async def mock_msg(self, ctx, user: discord.Member, *, content: str = ""):
         """Dispatch a message event as if it were sent by a different user.
 
@@ -370,7 +370,7 @@ class Dev(commands.Cog):
         ctx.bot.dispatch("message", msg)
 
     @commands.command()
-    @checks.is_owner()
+    @commands.is_owner()
     async def bypasscooldowns(self, ctx, toggle: Optional[bool] = None):
         """Give bot owners the ability to bypass cooldowns.
 
