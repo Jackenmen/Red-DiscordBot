@@ -1595,6 +1595,7 @@ class Red(
                 self.remove_permissions_hook(hook)
 
         super().remove_cog(cogname)
+        self.dispatch("cog_remove", cog)
 
         cog.requires.reset()
 
