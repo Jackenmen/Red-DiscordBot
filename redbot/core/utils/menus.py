@@ -28,7 +28,27 @@ _PageList = TypeVar("_PageList", List[str], List[discord.Embed])
 _ReactableEmoji = Union[str, discord.Emoji]
 _ControlCallable = Callable[[commands.Context, _PageList, discord.Message, int, float, str], _T]
 
+
+class _MenuCalled:
+    def __init__(self) -> None:
+        self._state = False
+
+    @property
+    def called(self) -> bool:
+        return self._state
+
+    def set(self) -> None:
+        self._state = True
+
+
+class _UnsetMenuCalled(_MenuCalled):
+    @property
+    def called(self) -> bool:
+        return False
+
+
 _active_menus: Dict[int, SimpleMenu] = {}
+_menu_called = ContextVar("_menu_called", default=_UnsetMenuCalled())
 
 
 class _GenericButton(discord.ui.Button):
@@ -48,11 +68,18 @@ class _GenericButton(discord.ui.Button):
             if self.emoji.is_unicode_emoji()
             else (ctx.bot.get_emoji(self.emoji.id) or self.emoji)
         )
+        menu_called = _MenuCalled()
         try:
+            token = _menu_called.set(menu_called)
             await self.func(ctx, pages, controls, message, page, timeout, emoji)
         except Exception:
             pass
+        finally:
+            _menu_called.reset(token)
         await interaction.response.defer()
+        if not menu_called.called:
+            # ???
+            ...
 
 
 async def menu(
@@ -100,6 +127,7 @@ async def menu(
     RuntimeError
         If either of the notes above are violated
     """
+    _menu_called.get().set()
     if message is not None and message.id in _active_menus:
         # prevents the expected callback from going any further
         # our custom button will always pass the message the view is
