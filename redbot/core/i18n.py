@@ -8,7 +8,7 @@ import logging
 import discord
 
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING, Union, Dict, Optional, TypeVar
+from typing import Any, Callable, TYPE_CHECKING, Union, Dict, Optional, TypeVar, overload
 from contextvars import ContextVar
 
 import babel.localedata
@@ -39,9 +39,14 @@ WAITING_FOR_MSGID = 1
 IN_MSGID = 2
 WAITING_FOR_MSGSTR = 3
 IN_MSGSTR = 4
+IN_MSGCTXT = 5
 
+MSGCTXT = 'msgctxt "'
 MSGID = 'msgid "'
-MSGSTR = 'msgstr "'
+MSGID_PLURAL = 'msgid_plural "'
+MSGSTR = 'msgstr'
+MSGSTR_SINGULAR = 'msgstr "'
+MSGSTR_PLURAL = 'msgstr['
 
 _translators = []
 
@@ -172,6 +177,9 @@ def _parse(translation_file: io.TextIOWrapper) -> Dict[str, str]:
 
     """
     step = None
+    context = None
+    plurals = None
+    plural_index = None
     untranslated = ""
     translated = ""
     translations = {}
@@ -182,24 +190,59 @@ def _parse(translation_file: io.TextIOWrapper) -> Dict[str, str]:
     for line in translation_file:
         line = line.strip()
 
-        if line.startswith(MSGID):
+        if line.startswith(MSGCTXT):
+            # record next context
+            step = IN_MSGCTXT
+            context = line[len(MSGCTXT) : -1]
+        elif line.startswith(MSGID):
             # New msgid
-            if step is IN_MSGSTR and translated:
+            if step is not IN_MSGCTXT:
+                context = None
+
+            if step in (IN_MSGCTXT, IN_MSGSTR) and translated:
                 # Store the last translation
-                translations[locale][_unescape(untranslated)] = _unescape(translated)
+                msg_id = _unescape(untranslated)
+                if context is not None:
+                    msg_id = f"{_unescape(context)}\x04{msg_id}"
+
+                if plurals is not None:
+                    last_index = max(plurals.keys())
+                    value = tuple(_unescape(plurals[idx]) for idx in range(last_index + 1))
+                else:
+                    value = _unescape(translated)
+
+                translations[locale][msg_id] = value
+
             step = IN_MSGID
             untranslated = line[len(MSGID) : -1]
+            plurals = None
+            plural_index = None
+        elif line.startswith(MSGID_PLURAL):
+            plurals = {}
         elif line.startswith('"') and line.endswith('"'):
             if step is IN_MSGID:
                 # Line continuing on from msgid
                 untranslated += line[1:-1]
             elif step is IN_MSGSTR:
                 # Line continuing on from msgstr
-                translated += line[1:-1]
+                if plurals is not None:
+                    plurals[plural_index] += line[1:-1]
+                else:
+                    translated += line[1:-1]
+            elif step is IN_MSGCTXT:
+                # Line continuing on from msgctxt
+                context += line[1:-1]
         elif line.startswith(MSGSTR):
             # New msgstr
             step = IN_MSGSTR
-            translated = line[len(MSGSTR) : -1]
+
+            if plurals is None:
+                translated = line[len(MSGSTR_SINGULAR) : -1]
+            else:
+                plural_start = len(MSGSTR_PLURAL)
+                plural_end = line.find("]", plural_start) - 1
+                plural_index = int(line[plural_start:plural_end])
+                plurals[plural_index] = line[plural_end + len(']: "') : -1]
 
     if step is IN_MSGSTR and translated:
         # Store the final translation
@@ -254,17 +297,84 @@ class Translator(Callable[[str], str]):
 
         self.load_translations()
 
-    def __call__(self, untranslated: str) -> str:
-        """Translate the given string.
+    @overload
+    def __call__(self, message: str, /) -> str:
+        ...
 
-        This will look for the string in the translator's :code:`.pot` file,
-        with respect to the current locale.
-        """
+    @overload
+    def __call__(self, context: str, message: str, /) -> str:
+        ...
+
+    @overload
+    def __call__(self, singular: str, plural: str, number: int, /) -> str:
+        ...
+
+    @overload
+    def __call__(self, context: str, singular: str, plural: str, number: int, /) -> str:
+        ...
+
+    def __call__(self, *args: Any) -> str:
+        """TODO: docstring"""
+        funcs = (None, self.gettext, self.pgettext, self.ngettext, self.npgettext)
+        return funcs[len(args)](*args)  # type: ignore
+
+    def gettext(self, message: str, /) -> str:
+        """TODO: docstring"""
         locale = get_locale()
+        catalog = self.translations[locale]
+
+        translated = catalog.get(message)
+        if translated is None:
+            # TODO: replace `0` with plural function for the locale
+            translated = catalog.get((message, 0))
+
+        if translated is None:
+            return message
+
+        return translated
+
+    def pgettext(self, context: str, message: str, /) -> str:
+        """TODO: docstring"""
+        locale = get_locale()
+        catalog = self.translations[locale]
+        msg_id = f"{context}\x04{message}"
+
+        translated = catalog.get(msg_id)
+        if translated is None:
+            # TODO: replace `0` with plural function for the locale
+            translated = catalog.get((msg_id, 0))
+
+        if translated is None:
+            return message
+
+        return translated
+
+    def ngettext(self, singular: str, plural: str, number: int, /) -> str:
+        """TODO: docstring"""
+        locale = get_locale()
+        catalog = self.translations[locale]
+
         try:
-            return self.translations[locale][untranslated]
+            # replace `number != 1` with plural function for the locale
+            return catalog[(singular, number != 1)]
         except KeyError:
-            return untranslated
+            if number == 1:
+                return singular
+            return plural
+
+    def npgettext(self, context: str, singular: str, plural: str, number: int, /) -> str:
+        """TODO: docstring"""
+        locale = get_locale()
+        catalog = self.translations[locale]
+        msg_id = f"{context}\x04{singular}"
+
+        try:
+            # replace `number != 1` with plural function for the locale
+            return catalog[(msg_id, number != 1)]
+        except KeyError:
+            if number == 1:
+                return singular
+            return plural
 
     def load_translations(self):
         """
