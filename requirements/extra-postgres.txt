@@ -1,6 +1,6 @@
-async-timeout==4.0.3
+asyncpg==0.29.0
+    # via -r extra-postgres.in
+async-timeout==4.0.3; python_version != "3.12"
     # via
     #   -c base.txt
     #   asyncpg
-asyncpg==0.29.0
-    # via -r extra-postgres.in

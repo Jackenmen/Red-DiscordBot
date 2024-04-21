@@ -23,9 +23,9 @@ pytest-mock==3.14.0
     # via -r extra-test.in
 tomlkit==0.12.4
     # via pylint
-exceptiongroup==1.2.0; python_version != "3.11"
+exceptiongroup==1.2.0; python_version != "3.12" and python_version != "3.11"
     # via pytest
-tomli==2.0.1; python_version != "3.11"
+tomli==2.0.1; python_version != "3.12" and python_version != "3.11"
     # via
     #   pylint
     #   pytest
