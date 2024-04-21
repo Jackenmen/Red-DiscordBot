@@ -34,7 +34,7 @@ def pip_compile(version: str, name: str) -> None:
     )
 
 
-for minor in range(8, 11 + 1):
+for minor in range(8, 12 + 1):
     version = f"3.{minor}"
     pip_compile(version, "base")
     shutil.copyfile(f"{sys.platform}-{version}-base.txt", "base.txt")
