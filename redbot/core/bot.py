@@ -1147,7 +1147,7 @@ class Red(
         i18n_locale = await self._config.locale()
         try:
             _i18n.set_global_locale(i18n_locale)
-        except ValueError:
+        except (ValueError, TypeError):
             log.warning(
                 "The bot's global locale was set to an invalid value (%r)"
                 " and will be reset to default (%s).",
@@ -1159,7 +1159,7 @@ class Red(
         i18n_regional_format = await self._config.regional_format()
         try:
             _i18n.set_global_regional_format(i18n_regional_format)
-        except ValueError:
+        except (ValueError, TypeError):
             log.warning(
                 "The bot's global regional format was set to an invalid value (%r)"
                 " and will be reset to default (which is to inherit global locale, i.e. %s).",
