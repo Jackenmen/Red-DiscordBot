@@ -77,6 +77,8 @@ yarl==1.15.2
     # via
     #   -r base.in
     #   aiohttp
+zstandard==0.23.0
+    # via -r base.in
 async-timeout==4.0.3; python_version != "3.11"
     # via aiohttp
 colorama==0.4.6; sys_platform == "win32"
