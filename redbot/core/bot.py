@@ -97,7 +97,7 @@ class _NoOwnerSet(RuntimeError):
 # all of our mixins should happen before,
 # and must include a call to super().__init__ unless they do not provide an init
 class Red(
-    commands.GroupMixin, RPCMixin, dpy_commands.bot.AutoShardedBot
+    commands.GroupMixin, RPCMixin, dpy_commands.bot.Bot
 ):  # pylint: disable=no-member # barely spurious warning caused by shadowing
     """Our subclass of discord.ext.commands.AutoShardedBot"""
 

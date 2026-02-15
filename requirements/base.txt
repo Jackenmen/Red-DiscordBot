@@ -18,7 +18,7 @@ brotli==1.1.0
     # via -r base.in
 click==8.1.8
     # via -r base.in
-discord-py==2.6.3
+discord.py @ git+https://github.com/Jackenmen/discord.py@28cfacb29fb6f9e7e8cab26414011f6639515007
     # via
     #   -r base.in
     #   red-lavalink
