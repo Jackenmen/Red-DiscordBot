@@ -307,14 +307,8 @@ class General(commands.Cog):
                     num /= 1000.0
                 return "{0:.1f}{1}".format(num, "YB")
 
-            shard_info = (
-                _("\nShard ID: **{shard_id}/{shard_count}**").format(
-                    shard_id=humanize_number(guild.shard_id + 1),
-                    shard_count=humanize_number(ctx.bot.shard_count),
-                )
-                if ctx.bot.shard_count > 1
-                else ""
-            )
+            # No shards on Fluxer yet.
+
             # Logic from: https://github.com/TrustyJAID/Trusty-cogs/blob/master/serverstats/serverstats.py#L159
             online_stats = {
                 _("Humans: "): lambda x: not x.bot,
@@ -362,8 +356,9 @@ class General(commands.Cog):
                 since_join=humanize_number((ctx.message.created_at - guild.me.joined_at).days),
             )
 
+            # Fluxer has no guild description yet
             data = discord.Embed(
-                description=(f"{guild.description}\n\n" if guild.description else "") + created_at,
+                description=created_at,
                 colour=await ctx.embed_colour(),
             )
             data.set_author(
@@ -392,12 +387,11 @@ class General(commands.Cog):
             data.add_field(
                 name=_("Utility:"),
                 value=_(
-                    "Owner: {owner}\nVerif. level: {verif}\nServer ID: {id}{shard_info}"
+                    "Owner: {owner}\nVerif. level: {verif}\nServer ID: {id}"
                 ).format(
                     owner=bold(str(guild.owner)),
                     verif=bold(verif[str(guild.verification_level)]),
                     id=bold(str(guild.id)),
-                    shard_info=shard_info,
                 ),
                 inline=False,
             )
@@ -447,20 +441,8 @@ class General(commands.Cog):
                     ),
                 )
 
-            if guild.premium_tier != 0:
-                nitro_boost = _(
-                    "Tier {boostlevel} with {nitroboosters} boosts\n"
-                    "File size limit: {filelimit}\n"
-                    "Emoji limit: {emojis_limit}\n"
-                    "VCs max bitrate: {bitrate}"
-                ).format(
-                    boostlevel=bold(str(guild.premium_tier)),
-                    nitroboosters=bold(humanize_number(guild.premium_subscription_count)),
-                    filelimit=bold(_size(guild.filesize_limit)),
-                    emojis_limit=bold(str(guild.emoji_limit)),
-                    bitrate=bold(_bitsize(guild.bitrate_limit)),
-                )
-                data.add_field(name=_("Nitro Boost:"), value=nitro_boost)
+            # Fluxer doesn't have premium information for guilds available yet
+
             if guild.splash:
                 data.set_image(url=guild.splash.replace(format="png"))
             data.set_footer(text=joined_on)
