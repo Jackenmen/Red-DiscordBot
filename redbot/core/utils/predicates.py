@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, ClassVar, List, Optional, Pattern, Sequence, Tuple, Union, cast
+from typing import Any, Callable, ClassVar, List, Optional, Pattern, Sequence, Tuple, Union, cast
 
 import discord
 from discord.ext import commands as dpy_commands
@@ -61,7 +61,7 @@ class MessagePredicate(Callable[[discord.Message], bool]):
 
     def __init__(self, predicate: Callable[["MessagePredicate", discord.Message], bool]) -> None:
         self._pred: Callable[["MessagePredicate", discord.Message], bool] = predicate
-        self.result = None
+        self.result: Any = None
 
     def __call__(self, message: discord.Message) -> bool:
         return self._pred(self, message)
@@ -928,7 +928,7 @@ class ReactionPredicate(Callable[[discord.Reaction, discord.abc.User], bool]):
         self._pred: Callable[
             ["ReactionPredicate", discord.Reaction, discord.abc.User], bool
         ] = predicate
-        self.result = None
+        self.result: Any = None
 
     def __call__(self, reaction: discord.Reaction, user: discord.abc.User) -> bool:
         return self._pred(self, reaction, user)
