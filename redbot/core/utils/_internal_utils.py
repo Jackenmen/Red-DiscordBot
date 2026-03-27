@@ -36,8 +36,9 @@ from packaging.specifiers import SpecifierSet
 from packaging.utils import parse_sdist_filename, parse_wheel_filename
 from packaging.version import Version
 import rapidfuzz
-from rich.progress import ProgressColumn
-from rich.progress_bar import ProgressBar
+import rich.progress
+from rich.console import Console
+from rich.text import Text
 from red_commons.logging import VERBOSE, TRACE
 
 from redbot.core import data_manager
@@ -59,6 +60,8 @@ __all__ = (
     "fetch_latest_red_version",
     "deprecated_removed",
     "RichIndefiniteBarColumn",
+    "RichSpeedColumn",
+    "detailed_progress",
     "cli_level_to_log_level",
 )
 
@@ -407,15 +410,42 @@ def deprecated_removed(
     )
 
 
-class RichIndefiniteBarColumn(ProgressColumn):
-    def render(self, task):
-        return ProgressBar(
+class RichIndefiniteBarColumn(rich.progress.ProgressColumn):
+    def render(self, task: rich.progress.Task) -> rich.progress.ProgressBar:
+        return rich.progress.ProgressBar(
             pulse=task.completed < task.total,
             animation_time=task.get_time(),
             width=40,
             total=task.total,
             completed=task.completed,
         )
+
+
+class RichSpeedColumn(rich.progress.ProgressColumn):
+    def __init__(self, *, unit: str) -> None:
+        self.unit = unit
+        super().__init__()
+
+    def render(self, task: rich.progress.Task) -> Text:
+        speed = task.finished_speed or task.speed
+        if speed is None:
+            return Text("?", style="progress.data.speed")
+        return Text(f"{int(speed)} {self.unit}/s", style="progress.data.speed")
+
+
+def detailed_progress(*, unit: str, console: Optional[Console] = None) -> rich.progress.Progress:
+    return rich.progress.Progress(
+        rich.progress.SpinnerColumn(),
+        rich.progress.TextColumn("[progress.description]{task.description}"),
+        rich.progress.BarColumn(bar_width=None),
+        RichSpeedColumn(unit=unit),
+        rich.progress.TaskProgressColumn(),
+        rich.progress.TextColumn("eta"),
+        rich.progress.TimeRemainingColumn(),
+        rich.progress.TextColumn("elapsed"),
+        rich.progress.TimeElapsedColumn(),
+        console=console,
+    )
 
 
 def cli_level_to_log_level(level: int) -> int:
