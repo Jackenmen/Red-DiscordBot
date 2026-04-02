@@ -1,24 +1,23 @@
 import asyncio
-import logging
 import os
 import sys
 from operator import itemgetter
+from pathlib import Path
 from typing import Any, Final, List, Literal, Optional, Set, Tuple
 
 import click
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from python_discovery import PythonInfo, get_interpreter
-from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.text import Text
 
 from redbot.core import data_manager
 from redbot.core._cli import asyncio_run
-from redbot.core.utils._internal_utils import cli_level_to_log_level, fetch_latest_red_version
+from redbot.core.utils._internal_utils import fetch_latest_red_version
 
-from . import changelog, cog_compatibility_checker, common
+from . import changelog, cog_compatibility_checker, common, runner
 from .tui import ChangelogReaderApp, ChangelogReaderResult
 
 
@@ -28,7 +27,7 @@ if instance_data is None:
 else:
     instance_list = list(instance_data.keys())
 
-_EXIT_INSTANCE_SITE_PREFIX_MISMATCH: Final = 3
+_EXIT_INSTANCE_SITE_PREFIX_MISMATCH: Final = 4
 _CHECK_COG_COMPATIBILITY_CMD_NAME: Final = "check-cog-compatibility"
 _RED_VERSION_CMD_ARG_NAME: Final = "--red-version"
 _PYTHON_VERSION_CMD_ARG_NAME: Final = "--python-version"
@@ -133,6 +132,15 @@ def _ask_for_interpreter(
 
 
 async def main(instances: List[str], excluded_instances: Set[str], *, ignore_prefix: bool) -> None:
+    # Just to present the issue on Windows
+    args = (sys.executable, "-m", "pip", "install", "-U", "aiohttp")
+    if ignore_prefix:
+        proc = await asyncio.create_subprocess_exec(*args)
+        if await proc.wait():
+            raise SystemExit(proc.returncode)
+    else:
+        runner.make_spawn_process_request(*args, new_start_args=("reinstall-example",))
+
     console = common.get_console()
     current_version = common.get_current_red_version()
     current_python_version = common.get_current_python_version()
