@@ -339,11 +339,7 @@ def cli(
     debug: bool,
     ignore_prefix: bool,
 ) -> None:
-    common.configure_rich()
-    level = cli_level_to_log_level(debug)
-    base_logger = logging.getLogger("red")
-    base_logger.setLevel(level)
-    base_logger.addHandler(RichHandler(console=common.get_console(stderr=True), show_path=False))
+    common.configure_logging(debug=debug)
 
     ctx.ensure_object(dict)
     ctx.obj["IGNORE_PREFIX"] = ignore_prefix
