@@ -299,7 +299,12 @@ async def do_migration(
     return new_storage_details
 
 
-async def create_backup(instance: str, destination_folder: Path = Path.home()) -> None:
+async def create_backup(
+    instance: str,
+    destination_folder: Path = Path.home(),
+    include_cogs: bool = False,
+    include_repos: bool = False,
+) -> None:
     data_manager.load_basic_configuration(instance)
     backend_type = get_current_backend(instance)
     if backend_type != BackendType.JSON:
@@ -307,7 +312,9 @@ async def create_backup(instance: str, destination_folder: Path = Path.home()) -
     print("Backing up the instance's data...")
     driver_cls = get_driver_class()
     await driver_cls.initialize(**data_manager.storage_details())
-    backup_fpath = await red_create_backup(destination_folder)
+    backup_fpath = await red_create_backup(
+        destination_folder, include_cogs=include_cogs, include_repos=include_repos
+    )
     await driver_cls.teardown()
     if backup_fpath is not None:
         print(f"A backup of {instance} has been made. It is at {backup_fpath}")
@@ -455,9 +462,14 @@ class RestoreInfo:
         if not isinstance(backup_version, int):
             print("This does not appear to be a valid backup.")
             sys.exit(1)
-        if backup_version > 2:
+        if backup_version > 3:
             print("This backup was created using newer version of Red. Update Red to restore it.")
             sys.exit(1)
+        if backup_details > 2:
+            for key in ("include_cogs", "include_repos"):
+                if not isinstance(backup_details.get(key), str):
+                    print("This does not appear to be a valid backup.")
+                    sys.exit(1)
         return backup_details
 
     @property
@@ -940,6 +952,23 @@ def convert(instance: str, backend: str) -> None:
         dir_okay=True, file_okay=False, resolve_path=True, writable=True, path_type=Path
     ),
     default=Path.home(),
+)
+@click.option(
+    "--include-installed-cogs",
+    is_flag=True,
+    default=False,
+    help="Include a copy of each of the installed cogs in the backup and their requirements.\n"
+    "NOTE: The requirements will still need to be reinstalled, if you restore the created backup"
+    " to a different OS.",
+)
+@click.option(
+    "--include-repos",
+    is_flag=True,
+    default=False,
+    help="Include a copy of each of the added repos. This should allow a cog reinstall even when"
+    " the repository is no longer available.\n"
+    "NOTE: Any cogs without the associated repo won't be restored unless --include-installed-cogs"
+    " is also specified.",
 )
 def backup(instance: str, destination_folder: Path) -> None:
     """Backup instance's data."""

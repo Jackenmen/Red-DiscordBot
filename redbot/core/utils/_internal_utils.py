@@ -236,13 +236,32 @@ def _tar_addfile_from_string(tar: tarfile.TarFile, name: str, string: str) -> No
     tar.addfile(tar_info, fp)
 
 
-class BackupDetails(TypedDict):
+class BackupDetailsBase(TypedDict):
     backup_version: int
 
 
-async def create_backup(dest: Path = Path.home()) -> Optional[Path]:
+class BackupDetailsV3(BackupDetailsBase):
+    include_cogs: bool
+    include_repos: bool
+
+
+BackupDetailsV1 = BackupDetailsBase
+BackupDetailsV2 = BackupDetailsBase
+BackupDetails = Union[
+    BackupDetailsV1,
+    BackupDetailsV2,
+    BackupDetailsV3,
+]
+
+
+async def create_backup(
+    dest: Path = Path.home(),
+    *,
+    include_cogs: bool = False,
+    include_repos: bool = False,
+) -> Optional[Path]:
     # version of backup
-    BACKUP_VERSION = 2
+    BACKUP_VERSION = 3
 
     data_path = Path(data_manager.core_data_path().parent)
     if not data_path.exists():
@@ -258,16 +277,19 @@ async def create_backup(dest: Path = Path.home()) -> Optional[Path]:
         "__pycache__",
         # Lavalink will be downloaded on Audio load
         "Lavalink.jar",
-        # cogs and repos installed through Downloader can be reinstalled using restore command
-        os.path.join("Downloader", "lib", ""),
-        os.path.join("CogManager", "cogs", ""),
-        os.path.join("RepoManager", "repos", ""),
         os.path.join("Audio", "logs", ""),
         # these files are created during backup so we exclude them from data path backup
         os.path.join("RepoManager", "repos.json"),
         "instance.json",
         "backup_details.json",
     ]
+
+    # cogs and repos installed through Downloader can be reinstalled using restore command
+    if not include_cogs:
+        exclusions.append(os.path.join("Downloader", "lib", ""))
+        exclusions.append(os.path.join("CogManager", "cogs", ""))
+    if not include_repos:
+        exclusions.append(os.path.join("RepoManager", "repos", ""))
 
     # Avoiding circular imports
     from redbot.core._downloader.repo_manager import RepoManager
@@ -282,8 +304,10 @@ async def create_backup(dest: Path = Path.home()) -> Optional[Path]:
         if not any(ex in str(f) for ex in exclusions) and f.is_file():
             to_backup.append(f)
 
-    backup_details: BackupDetails = {
+    backup_details: BackupDetailsV3 = {
         "backup_version": BACKUP_VERSION,
+        "include_cogs": include_cogs,
+        "include_repos": include_repos,
     }
 
     with tarfile.open(str(backup_fpath), "w:gz", dereference=True) as tar:
