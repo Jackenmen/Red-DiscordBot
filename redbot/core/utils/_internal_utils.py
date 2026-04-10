@@ -13,16 +13,19 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import (
+    Any,
     AsyncIterable,
     AsyncIterator,
     Awaitable,
     Callable,
+    Dict,
     Generator,
     Iterable,
     Iterator,
     List,
     Optional,
     Union,
+    TypedDict,
     TypeVar,
     TYPE_CHECKING,
     Tuple,
@@ -31,13 +34,18 @@ from typing import (
 
 import aiohttp
 import discord
-from packaging.requirements import Requirement
+import yarl
+from packaging.metadata import Metadata
+from packaging.specifiers import SpecifierSet
+from packaging.utils import parse_sdist_filename
+from packaging.version import Version
 import rapidfuzz
 from rich.progress import ProgressColumn
 from rich.progress_bar import ProgressBar
 from red_commons.logging import VERBOSE, TRACE
+from typing_extensions import NotRequired, Self
 
-from redbot import VersionInfo
+from redbot import __version__
 from redbot.core import data_manager
 from redbot.core.utils.chat_formatting import box
 
@@ -54,14 +62,24 @@ __all__ = (
     "create_backup",
     "send_to_owners_with_preprocessor",
     "send_to_owners_with_prefix_replaced",
-    "expected_version",
-    "fetch_latest_red_version_info",
+    "ReleaseFile",
+    "AvailableVersion",
+    "fetch_available_red_versions",
+    "fetch_latest_red_version",
     "deprecated_removed",
     "RichIndefiniteBarColumn",
     "cli_level_to_log_level",
 )
 
 _T = TypeVar("_T")
+
+# I guess there's nothing in allowing people to use an alternative index.
+_SIMPLE_API_URL = os.getenv("RED_SIMPLE_API_URL") or "https://pypi.org/simple/"
+# This variable should only be used for debugging purposes (hence why it starts with `_`).
+# You can debug the behavior by e.g. creating a "Red-DiscordBot.json" file,
+# starting a server with `python -m http.server` and starting Red with the following env vars:
+# RED_SIMPLE_API_URL=http://localhost:8000 _RED_SIMPLE_API_ENDPOINT_PATH=Red-DiscordBot.json
+_SIMPLE_API_ENDPOINT_PATH = os.getenv("_RED_SIMPLE_API_ENDPOINT_PATH") or "Red-DiscordBot"
 
 
 def safe_delete(pth: Path):
@@ -321,14 +339,100 @@ async def send_to_owners_with_prefix_replaced(bot: Red, content: str, **kwargs):
     await send_to_owners_with_preprocessor(bot, content, content_preprocessor=preprocessor)
 
 
-def expected_version(current: str, expected: str) -> bool:
-    # Requirement needs a regular requirement string, so "x" serves as requirement's name here
-    return Requirement(f"x{expected}").specifier.contains(current, prereleases=True)
+# gotta use functional TypedDict syntax due to hyphens in keys
+ReleaseFile = TypedDict(
+    "ReleaseFile",
+    {
+        "filename": str,
+        "url": str,
+        "hashes": Dict[str, str],
+        "requires-python": NotRequired[str],
+        "core-metadata": NotRequired[Union[bool, Dict[str, str]]],
+        "yanked": bool,
+        "size": int,
+        "upload-time": NotRequired[str],
+        "provenance": NotRequired[Optional[str]],
+    },
+)
 
 
-async def fetch_latest_red_version_info() -> Tuple[VersionInfo, Optional[str]]:
+class AvailableVersion:
+    def __init__(self, version: Version, files: Dict[str, ReleaseFile]) -> None:
+        self.version = version
+        self.files = files
+        required_pythons = {f.get("requires-python") or "" for f in files.values()}
+        if len(required_pythons) > 1:
+            raise ValueError("found multiple files with different Requires-Python values")
+        self.requires_python = SpecifierSet(required_pythons.pop())
+
+    @classmethod
+    def from_json_dict(cls, data: Dict[str, Any]) -> Self:
+        ret = cls(Version(data["version"]), data["files"])
+        if str(ret.requires_python) != data["requires_python"]:
+            raise ValueError("requires_python key in given data is inconsistent with files")
+        return ret
+
+    def to_json_dict(self) -> Dict[str, Any]:
+        return {
+            "version": str(self.version),
+            "requires_python": str(self.requires_python),
+            "files": self.files,
+        }
+
+    async def fetch_core_metadata(self) -> Metadata:
+        for release_file in self.files.values():
+            core_metadata_hashes = release_file.get("core-metadata", False)
+            if core_metadata_hashes is False:
+                continue
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{release_file['url']}.metadata") as resp:
+                    return Metadata.from_email(await resp.read(), validate=False)
+        raise TypeError("Could not find core metadata for any of the release files.")
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version == other.version
+        return NotImplemented
+
+    def __ne__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version != other.version
+        return NotImplemented
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version < other.version
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version <= other.version
+        return NotImplemented
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version > other.version
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, self.__class__):
+            return self.version >= other.version
+        return NotImplemented
+
+
+async def fetch_available_red_versions(
+    *, include_prereleases: Optional[bool] = None
+) -> List[AvailableVersion]:
     """
-    Fetch information about latest Red release on PyPI.
+    Fetch information about Red releases available on PyPI,
+    sorted by version (latest first).
+
+    Parameters
+    ----------
+    include_prereleases : bool, optional
+        Whether the pre-releases should be included in the list.
+        If ``None`` (the default), the pre-releases will only be included,
+        if the currently running Red version is considered a pre-release.
 
     Raises
     ------
@@ -337,18 +441,93 @@ async def fetch_latest_red_version_info() -> Tuple[VersionInfo, Optional[str]]:
     TimeoutError
         The request to PyPI timed out.
     ValueError
-        An invalid version string was returned in PyPI metadata.
+        Some part of the response was considered invalid.
+        This includes issues such as incorrect response content type,
+        invalid version strings, inability to find files for a release,
+        and mismatching Requires-Python values.
     KeyError
         The PyPI metadata is missing some of the required information.
     """
+    if include_prereleases is None:
+        include_prereleases = Version(__version__).is_prerelease
+    expected_content_type = "application/vnd.pypi.simple.v1+json"
     async with aiohttp.ClientSession() as session:
-        async with session.get("https://pypi.org/pypi/Red-DiscordBot/json") as r:
-            data = await r.json()
+        async with session.get(
+            yarl.URL(_SIMPLE_API_URL) / _SIMPLE_API_ENDPOINT_PATH,
+            headers={"Accept": expected_content_type},
+        ) as resp:
+            data = await resp.json()
+            content_type = resp.headers["Content-Type"]
+            if not (
+                content_type.startswith(expected_content_type)
+                or (
+                    content_type == "application/json"
+                    and data["meta"]["api-version"].startswith("1.")
+                )
+            ):
+                raise ValueError("got unexpected response from Simple Repository API")
 
-    release = VersionInfo.from_str(data["info"]["version"])
-    required_python = data["info"]["requires_python"]
+    files: Dict[Version, Dict[str, ReleaseFile]] = {}
+    f: ReleaseFile
+    for f in data["files"]:
+        if f.get("yanked"):
+            continue
+        filename = f["filename"]
+        if filename.endswith((".tar.gz", ".zip")):
+            _, version = parse_sdist_filename(filename)
+        elif filename.endswith(".whl"):
+            # https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention
+            _, raw_version, _ = filename.split("-", 2)
+            version = Version(raw_version)
+        else:
+            continue
+        if version.is_prerelease and not include_prereleases:
+            continue
+        version_files = files.setdefault(version, {})
+        version_files[f["filename"]] = f
 
-    return release, required_python
+    if not files:
+        raise ValueError("could not find any files")
+
+    available_versions = [
+        AvailableVersion(version, version_files) for version, version_files in files.items()
+    ]
+    available_versions.sort(reverse=True)
+
+    return available_versions
+
+
+async def fetch_latest_red_version(
+    *, include_prereleases: Optional[bool] = None
+) -> AvailableVersion:
+    """
+    Fetch information about latest Red release on PyPI.
+
+    Parameters
+    ----------
+    include_prereleases : bool, optional
+        Whether the pre-releases should be considered when finding the latest version.
+        If ``None`` (the default), the pre-releases will only be considered,
+        if the currently running Red version is considered a pre-release.
+
+    Raises
+    ------
+    aiohttp.ClientError
+        An error occurred during request to PyPI.
+    TimeoutError
+        The request to PyPI timed out.
+    ValueError
+        Some part of the response was considered invalid.
+        This includes issues such as incorrect response content type,
+        invalid version strings, inability to find files for a release,
+        and mismatching Requires-Python values.
+    KeyError
+        The PyPI metadata is missing some of the required information.
+    """
+    available_versions = await fetch_available_red_versions(
+        include_prereleases=include_prereleases
+    )
+    return available_versions[0]
 
 
 def deprecated_removed(
