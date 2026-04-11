@@ -391,11 +391,13 @@ def reinstall(
     executable = str(scripts_path / f"python{sysconfig.get_config_var('EXE')}")
 
     common.print_with_prefix_column(common.ICON_INFO, "Starting the install process...")
+    console = common.get_console()
     try:
-        subprocess.check_call((executable, "-m", "pip", "install", "-U", "pip"))
+        with console.status("Creating a new virtual environment..."):
+            subprocess.check_call((executable, "-m", "pip", "install", "-U", "pip"))
+        console.print("Created a new virtual environment.")
         subprocess.check_call((executable, "-m", "pip", "install", dependency_specifier))
     except subprocess.CalledProcessError:
-        console = common.get_console()
         console.print()
         common.print_with_prefix_column(
             common.ICON_ERROR,
