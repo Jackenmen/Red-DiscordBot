@@ -133,6 +133,7 @@ def parse_cli_flags(args):
     parser = argparse.ArgumentParser(
         description="Red - Discord Bot", usage="redbot <instance_name> [arguments]"
     )
+    parser.suggest_on_error = True
     parser.add_argument("--version", "-V", action="store_true", help="Show Red's current version")
     parser.add_argument("--debuginfo", action="store_true", help="Show debug information.")
     parser.add_argument(
