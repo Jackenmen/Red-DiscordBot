@@ -18,17 +18,20 @@ from .app_commands import (
     NoPrivateMessage,
     TransformerError,
     UserFeedbackCheckFailure,
+    locale_str,
 )
+from .app_commands.commands import CommandCallback, ContextMenuCallback, P, T
 from redbot.core.i18n import (
     Translator,
     set_contextual_locales_from_guild,
 )
 from .utils.chat_formatting import humanize_list, inline
 
+import inspect
 import logging
 import traceback
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Tuple, Union, Optional, Sequence
+from typing import Any, Callable, List, Dict, Tuple, Union, Optional, Sequence
 
 __all__ = ("RedTree",)
 
@@ -51,6 +54,72 @@ class RedTree(CommandTree):
         self._disabled_global_commands: Dict[str, Union[Command, Group]] = {}
         self._disabled_context_menus: Dict[Tuple[str, Optional[int], int], ContextMenu] = {}
 
+    @discord.utils.copy_doc(CommandTree.command)
+    def command(
+        self,
+        *,
+        name: Union[str, locale_str] = MISSING,
+        description: Union[str, locale_str] = MISSING,
+        nsfw: bool = False,
+        guild: Optional[Snowflake] = MISSING,
+        guilds: Sequence[Snowflake] = MISSING,
+        auto_locale_strings: bool = True,
+        extras: Dict[Any, Any] = MISSING,
+    ) -> Callable[[CommandCallback[Group, P, T]], Command[Group, P, T]]:
+        def decorator(func: CommandCallback[Group, P, T]) -> Command[Group, P, T]:
+            if not inspect.iscoroutinefunction(func):
+                raise TypeError("command function must be a coroutine function")
+
+            if description is MISSING:
+                if func.__doc__ is None:
+                    desc = "\N{HORIZONTAL ELLIPSIS}"
+                else:
+                    desc = discord.utils._shorten(func.__doc__)
+            else:
+                desc = description
+
+            command = Command(
+                name=name if name is not MISSING else func.__name__,
+                description=desc,
+                callback=func,
+                nsfw=nsfw,
+                parent=None,
+                auto_locale_strings=auto_locale_strings,
+                extras=extras,
+            )
+            self.add_command(command, guild=guild, guilds=guilds)
+            return command
+
+        return decorator
+
+    @discord.utils.copy_doc(CommandTree.context_menu)
+    def context_menu(
+        self,
+        *,
+        name: Union[str, locale_str] = MISSING,
+        nsfw: bool = False,
+        guild: Optional[Snowflake] = MISSING,
+        guilds: Sequence[Snowflake] = MISSING,
+        auto_locale_strings: bool = True,
+        extras: Dict[Any, Any] = MISSING,
+    ) -> Callable[[ContextMenuCallback], ContextMenu]:
+        def decorator(func: ContextMenuCallback) -> ContextMenu:
+            if not inspect.iscoroutinefunction(func):
+                raise TypeError("context menu function must be a coroutine function")
+
+            actual_name = func.__name__.title() if name is MISSING else name
+            context_menu = ContextMenu(
+                name=actual_name,
+                nsfw=nsfw,
+                callback=func,
+                auto_locale_strings=auto_locale_strings,
+                extras=extras,
+            )
+            self.add_command(context_menu, guild=guild, guilds=guilds)
+            return context_menu
+
+        return decorator
+
     def add_command(
         self,
         command: Union[Command, ContextMenu, Group],
@@ -65,6 +134,11 @@ class RedTree(CommandTree):
 
         Commands will be internally stored until enabled by ``[p]slash enable``.
         """
+        if not isinstance(command, (Command, ContextMenu, Group)):
+            raise TypeError(
+                f"Expected an application command, received {command.__class__.__name__} instead"
+            )
+
         # Allow guild specific commands to bypass the internals for development
         if (
             guild is not MISSING
@@ -90,11 +164,6 @@ class RedTree(CommandTree):
 
             self._disabled_context_menus[key] = command
             return
-
-        if not isinstance(command, (Command, Group)):
-            raise TypeError(
-                f"Expected an application command, received {command.__class__.__name__} instead"
-            )
 
         root = command.root_parent or command
         name = root.name
