@@ -18,7 +18,6 @@ from discord.app_commands import (
     AppInstallationType as AppInstallationType,
     Argument as Argument,
     BotMissingPermissions as BotMissingPermissions,
-    Command as Command,
     CommandAlreadyRegistered as CommandAlreadyRegistered,
     CommandInvokeError as CommandInvokeError,
     CommandLimitReached as CommandLimitReached,
@@ -27,9 +26,7 @@ from discord.app_commands import (
     CommandSignatureMismatch as CommandSignatureMismatch,
     CommandSyncFailure as CommandSyncFailure,
     CommandTree as CommandTree,
-    ContextMenu as ContextMenu,
     Cooldown as Cooldown,
-    Group as Group,
     GuildAppCommandPermissions as GuildAppCommandPermissions,
     MissingAnyRole as MissingAnyRole,
     MissingApplicationID as MissingApplicationID,
@@ -55,8 +52,6 @@ from discord.app_commands import (
     CheckFailure as CheckFailure,
     Choice as Choice,
     choices as choices,
-    command as command,
-    context_menu as context_menu,
     default_permissions as default_permissions,
     describe as describe,
     dm_only as dm_only,
@@ -70,6 +65,13 @@ from discord.app_commands import (
 )
 
 from . import checks as checks
+from .commands import (
+    Command as Command,
+    ContextMenu as ContextMenu,
+    Group as Group,
+    command as command,
+    context_menu as context_menu,
+)
 from .errors import (
     UserFeedbackCheckFailure as UserFeedbackCheckFailure,
 )

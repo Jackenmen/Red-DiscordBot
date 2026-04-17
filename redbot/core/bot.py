@@ -415,6 +415,26 @@ class Red(
         del dev.env_extensions[name]
 
     def get_command(self, name: str, /) -> Optional[commands.Command]:
+        """
+        Get a `commands.Command` from the internal list
+        of commands.
+
+        This could also be used as a way to get aliases.
+
+        The name could be fully qualified (e.g. ``'foo bar'``) will get
+        the subcommand ``bar`` of the group command ``foo``. If a
+        subcommand is not found then ``None`` is returned just as usual.
+
+        Parameters
+        -----------
+        name: `str`
+            The name of the command to get.
+
+        Returns
+        --------
+        Optional[`commands.Command`]
+            The command that was requested. If not found, returns ``None``.
+        """
         com = super().get_command(name)
         assert com is None or isinstance(com, commands.Command)
         return com
@@ -2095,8 +2115,26 @@ class Red(
             raise
 
     def add_command(self, command: commands.Command, /) -> None:
+        """
+        Adds a `commands.Command` into the internal list of commands.
+
+        This is usually not called, instead the :meth:`GroupMixin.command` or
+        :meth:`GroupMixin.group` shortcut decorators are used instead.
+
+        Parameters
+        -----------
+        command: `commands.Command`
+            The command to add.
+
+        Raises
+        -------
+        CommandRegistrationError
+            If the command or its alias is already registered by different command.
+        TypeError
+            If the command passed is not a subclass of `commands.Command`.
+        """
         if not isinstance(command, commands.Command):
-            raise RuntimeError("Commands must be instances of `redbot.core.commands.Command`")
+            raise TypeError("Commands must be instances of `redbot.core.commands.Command`")
 
         super().add_command(command)
 
@@ -2113,6 +2151,23 @@ class Red(
             command.app_command.extras = command.extras
 
     def remove_command(self, name: str, /) -> Optional[commands.Command]:
+        """
+        Remove a `commands.Command` from the internal list
+        of commands.
+
+        This could also be used as a way to remove aliases.
+
+        Parameters
+        -----------
+        name: :class:`str`
+            The name of the command to remove.
+
+        Returns
+        --------
+        Optional[`commands.Command`]
+            The command that was removed. If the name is not valid then
+            ``None`` is returned instead.
+        """
         command = super().remove_command(name)
         if command is None:
             return None
