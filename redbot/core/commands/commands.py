@@ -42,6 +42,7 @@ from discord.ext.commands import (
     Group as DPYGroup,
     Greedy,
 )
+from discord.ext.commands.hybrid import HybridAppCommand as DPYHybridAppCommand,
 
 from .requires import PermState, PrivilegeLevel, Requires, PermStateAllowedStates
 from .. import app_commands
@@ -1058,6 +1059,37 @@ class GroupCog(Cog, DPYGroupCog):
     """
 
 
+class _HybridAppCommand(DPYHybridAppCommand[_CogT, _P, _T]):
+    async def _check_can_run(self, interaction: discord.Interaction) -> bool:
+        if not super()._check_can_run(interaction):
+            return False
+
+        # Below should be equivalent to the extra permissions stuff done by us
+        # in our `Command.can_run()`.
+
+        ctx = interaction._baton
+        command = self.wrapped
+
+        # Since we're starting from the beginning, we should reset the state to normal
+        ctx.permission_state = PermState.NORMAL
+
+        if command.cog is not None:
+            ret = await command.cog.requires.verify(ctx)
+            if ret is False:
+                return False
+
+        for parent in reversed(command.parents):
+            try:
+                result = await parent.requires.verify(ctx, change_permission_state=True)
+            except CommandError:
+                result = False
+
+            if result is False:
+                return False
+
+        return await command.requires.verify(ctx)
+
+
 class HybridCommand(Command, DPYHybridCommand[_CogT, _P, _T]):
     """HybridCommand class for Red.
 
@@ -1069,6 +1101,10 @@ class HybridCommand(Command, DPYHybridCommand[_CogT, _P, _T]):
 
         This class is not intended to be subclassed.
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.app_command = _HybridAppCommand(self) if self.with_app_command else None
 
 
 class HybridGroup(Group, DPYHybridGroup[_CogT, _P, _T]):
