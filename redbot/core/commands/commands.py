@@ -42,7 +42,7 @@ from discord.ext.commands import (
     Group as DPYGroup,
     Greedy,
 )
-from discord.ext.commands.hybrid import HybridAppCommand as DPYHybridAppCommand,
+from discord.ext.commands.hybrid import HybridAppCommand as DPYHybridAppCommand
 
 from .requires import PermState, PrivilegeLevel, Requires, PermStateAllowedStates
 from .. import app_commands
@@ -1106,6 +1106,16 @@ class HybridCommand(Command, DPYHybridCommand[_CogT, _P, _T]):
         super().__init__(*args, **kwargs)
         self.app_command = _HybridAppCommand(self) if self.with_app_command else None
 
+    async def can_run(self, ctx: "Context", /) -> bool:
+        cmd_enabled = self.is_enabled(ctx.guild)
+        if not cmd_enabled:
+            raise DisabledCommand(f"{self.name} command is disabled")
+
+        if ctx.interaction is not None and self.app_command:
+            return await self.app_command._check_can_run(ctx.interaction)
+        else:
+            return await super().can_run(ctx)
+
 
 class HybridGroup(Group, DPYHybridGroup[_CogT, _P, _T]):
     """HybridGroup command class for Red.
@@ -1169,6 +1179,13 @@ class HybridGroup(Group, DPYHybridGroup[_CogT, _P, _T]):
             return result
 
         return decorator
+
+    async def can_run(self, ctx: "Context", /) -> bool:
+        fallback = self._fallback_command
+        if ctx.interaction is not None and fallback:
+            return await fallback._check_can_run(ctx.interaction)
+        else:
+            return await super().can_run(ctx)
 
 
 def hybrid_command(
