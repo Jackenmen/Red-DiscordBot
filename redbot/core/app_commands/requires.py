@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, TypeVar, Union
 from typing_extensions import TypeAlias
@@ -220,3 +221,282 @@ class AppCommandRequires(RequiresBase):
         if not self.checks:
             return True
         return await discord.utils.async_all(check(interaction) for check in self.checks)
+
+
+# check decorators
+
+
+def permissions_check(predicate: CheckPredicate) -> Callable[[_T], _T]:
+    """An overwriteable version of `discord.ext.commands.check`.
+
+    This has the same behaviour as `discord.ext.commands.check`,
+    however this check can be ignored if the command is allowed
+    through a permissions cog.
+    """
+
+    def decorator(func: _T) -> _T:
+        if hasattr(func, "red_app_command_requires"):
+            func.red_app_command_requires.checks.append(predicate)
+        else:
+            if not hasattr(func, "__red_app_command_requires_checks__"):
+                func.__red_app_command_requires_checks__ = []
+            func.__red_app_command_requires_checks__.append(predicate)
+        return func
+
+    return decorator
+
+
+def bot_has_permissions(**perms: bool) -> Callable[[_T], _T]:
+    """Complain if the bot is missing permissions.
+
+    If the user tries to run the command, but the bot is missing the
+    permissions, it will send a message describing which permissions
+    are missing.
+
+    This check cannot be overridden by rules.
+    """
+
+    def decorator(func: _T) -> _T:
+        if asyncio.iscoroutinefunction(func):
+            if not hasattr(func, "__red_app_command_requires_bot_perms__"):
+                func.__red_app_command_requires_bot_perms__ = discord.Permissions.none()
+            _validate_perms_dict(perms)
+            func.__red_app_command_requires_bot_perms__.update(**perms)
+        else:
+            _validate_perms_dict(perms)
+            func.red_app_command_requires.bot_perms.update(**perms)
+        return func
+
+    return decorator
+
+
+def bot_in_a_guild() -> Callable[[_T], _T]:
+    """Deny the command if the bot is not in a guild."""
+
+    async def predicate(interaction: Interaction):
+        return len(interaction.client.guilds) > 0
+
+    return check(predicate)
+
+
+def bot_can_manage_channel(*, allow_thread_owner: bool = False) -> Callable[[_T], _T]:
+    """
+    Complain if the bot is missing permissions to manage channel.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+
+    Parameters
+    ----------
+    allow_thread_owner: bool
+        If ``True``, the command will also be allowed to run if the bot is a thread owner.
+        This can, for example, be useful to check if the bot can edit a channel/thread's name
+        as that, in addition to members with manage channel/threads permission,
+        can also be done by the thread owner.
+    """
+
+    def predicate(interaction: Interaction) -> bool:
+        if interaction.guild_id is None:
+            return False
+
+        perms = interaction.app_permissions
+        channel = interaction.channel
+        obj = interaction.user
+        if isinstance(channel, discord.Thread):
+            if not (perms.manage_threads or (allow_thread_owner and channel.owner_id == obj.id)):
+                # This is a slight lie - thread owner *might* also be allowed
+                # but we just say that bot is missing the Manage Threads permission.
+                raise BotMissingPermissions(["manage_threads"])
+        elif not perms.manage_channels:
+            raise BotMissingPermissions(["manage_channels"])
+
+        return True
+
+    return check(predicate)
+
+
+def bot_can_react() -> Callable[[_T], _T]:
+    """
+    Complain if the bot is missing permissions to react.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+    """
+
+    async def predicate(interaction: Interaction) -> bool:
+        return not (
+            isinstance(interaction.channel, discord.Thread) and interaction.channel.archived
+        )
+
+    def decorator(func: _T) -> _T:
+        func = bot_has_permissions(read_message_history=True, add_reactions=True)(func)
+        func = check(predicate)(func)
+        return func
+
+    return decorator
+
+
+def _can_manage_channel_deco(
+    *, privilege_level: Optional[PrivilegeLevel] = None, allow_thread_owner: bool = False
+) -> Callable[[_T], _T]:
+    async def predicate(interaction: Interaction) -> bool:
+        perms = interaction.permissions
+        channel = interaction.channel
+        obj = interaction.user
+        if isinstance(channel, discord.Thread):
+            if perms.manage_threads or (allow_thread_owner and channel.owner_id == obj.id):
+                # This is a slight lie - thread owner *might* also be allowed
+                # but we just say that bot is missing the Manage Threads permission.
+                return True
+        elif perms.manage_channels:
+            return True
+
+        if privilege_level is not None:
+            if await PrivilegeLevel.from_interaction(interaction) >= privilege_level:
+                return True
+
+        return False
+
+    return permissions_check(predicate)
+
+
+def has_permissions(**perms: bool):
+    """Restrict the command to users with these permissions.
+
+    This check can be overridden by rules.
+    """
+    if perms is None:
+        raise TypeError("Must provide at least one keyword argument to has_permissions")
+    return AppCommandRequires.get_decorator(None, perms)
+
+
+def can_manage_channel(*, allow_thread_owner: bool = False) -> Callable[[_T], _T]:
+    """Restrict the command to users with permissions to manage channel.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+
+    This check can be overridden by rules.
+
+    Parameters
+    ----------
+    allow_thread_owner: bool
+        If ``True``, the command will also be allowed to run if the author is a thread owner.
+        This can, for example, be useful to check if the author can edit a channel/thread's name
+        as that, in addition to members with manage channel/threads permission,
+        can also be done by the thread owner.
+    """
+    return _can_manage_channel_deco(allow_thread_owner=allow_thread_owner)
+
+
+def is_owner():
+    """Restrict the command to bot owners.
+
+    This check cannot be overridden by rules.
+    """
+    return AppCommandRequires.get_decorator(PrivilegeLevel.BOT_OWNER, {})
+
+
+def guildowner_or_permissions(**perms: bool):
+    """Restrict the command to the guild owner or users with these permissions.
+
+    This check can be overridden by rules.
+    """
+    return AppCommandRequires.get_decorator(PrivilegeLevel.GUILD_OWNER, perms)
+
+
+def guildowner_or_can_manage_channel(*, allow_thread_owner: bool = False) -> Callable[[_T], _T]:
+    """Restrict the command to the guild owner or user with permissions to manage channel.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+
+    This check can be overridden by rules.
+
+    Parameters
+    ----------
+    allow_thread_owner: bool
+        If ``True``, the command will also be allowed to run if the author is a thread owner.
+        This can, for example, be useful to check if the author can edit a channel/thread's name
+        as that, in addition to members with manage channel/threads permission,
+        can also be done by the thread owner.
+    """
+    return _can_manage_channel_deco(
+        privilege_level=PrivilegeLevel.GUILD_OWNER, allow_thread_owner=allow_thread_owner
+    )
+
+
+def guildowner():
+    """Restrict the command to the guild owner.
+
+    This check can be overridden by rules.
+    """
+    return guildowner_or_permissions()
+
+
+def admin_or_permissions(**perms: bool):
+    """Restrict the command to users with the admin role or these permissions.
+
+    This check can be overridden by rules.
+    """
+    return AppCommandRequires.get_decorator(PrivilegeLevel.ADMIN, perms)
+
+
+def admin_or_can_manage_channel(*, allow_thread_owner: bool = False) -> Callable[[_T], _T]:
+    """Restrict the command to users with the admin role or permissions to manage channel.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+
+    This check can be overridden by rules.
+
+    Parameters
+    ----------
+    allow_thread_owner: bool
+        If ``True``, the command will also be allowed to run if the author is a thread owner.
+        This can, for example, be useful to check if the author can edit a channel/thread's name
+        as that, in addition to members with manage channel/threads permission,
+        can also be done by the thread owner.
+    """
+    return _can_manage_channel_deco(
+        privilege_level=PrivilegeLevel.ADMIN, allow_thread_owner=allow_thread_owner
+    )
+
+
+def admin():
+    """Restrict the command to users with the admin role.
+
+    This check can be overridden by rules.
+    """
+    return admin_or_permissions()
+
+
+def mod_or_permissions(**perms: bool):
+    """Restrict the command to users with the mod role or these permissions.
+
+    This check can be overridden by rules.
+    """
+    return AppCommandRequires.get_decorator(PrivilegeLevel.MOD, perms)
+
+
+def mod_or_can_manage_channel(*, allow_thread_owner: bool = False) -> Callable[[_T], _T]:
+    """Restrict the command to users with the mod role or permissions to manage channel.
+
+    This check properly resolves the permissions for `discord.Thread` as well.
+
+    This check can be overridden by rules.
+
+    Parameters
+    ----------
+    allow_thread_owner: bool
+        If ``True``, the command will also be allowed to run if the author is a thread owner.
+        This can, for example, be useful to check if the author can edit a channel/thread's name
+        as that, in addition to members with manage channel/threads permission,
+        can also be done by the thread owner.
+    """
+    return _can_manage_channel_deco(
+        privilege_level=PrivilegeLevel.MOD, allow_thread_owner=allow_thread_owner
+    )
+
+
+def mod():
+    """Restrict the command to users with the mod role.
+
+    This check can be overridden by rules.
+    """
+    return mod_or_permissions()
