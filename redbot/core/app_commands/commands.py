@@ -8,6 +8,7 @@ from typing import (
     Coroutine,
     Dict,
     List,
+    MutableMapping,
     Optional,
     TypeVar,
     Union,
@@ -17,6 +18,9 @@ import discord
 from discord import app_commands as dpy_app_commands
 from typing_extensions import Concatenate, ParamSpec, TypeAlias
 from redbot.core import commands
+from redbot.core.commands.requires import PermState, PrivilegeLevel
+
+from .requires import AppCommandRequires
 
 if TYPE_CHECKING:
     from redbot.core.bot import Red
@@ -27,6 +31,7 @@ Binding = Union["Group", "commands.Cog"]
 GroupT = TypeVar("GroupT", bound=Binding)
 Coro = Coroutine[Any, Any, T]
 Interaction: TypeAlias = discord.Interaction["Red"]
+Check = Callable[[Interaction], Union[bool, Coro[bool]]]
 CommandCallback = Union[
     Callable[Concatenate[GroupT, Interaction, P], Coro[T]],
     Callable[Concatenate[Interaction, P], Coro[T]],
@@ -93,6 +98,52 @@ class Command(dpy_app_commands.Command[GroupT, P, T]):
             auto_locale_strings=auto_locale_strings,
             extras=extras,
         )
+        self.red_app_command_requires = AppCommandRequires(
+            privilege_level=getattr(
+                callback, "__red_app_command_requires_privilege_level__", PrivilegeLevel.NONE
+            ),
+            user_perms=getattr(callback, "__red_app_command_requires_user_perms__", {}),
+            bot_perms=getattr(callback, "__red_app_command_requires_bot_perms__", {}),
+            checks=getattr(callback, "__red_app_command_requires_checks__", []),
+        )
+
+    def _copy_with(
+        self,
+        *,
+        parent: Optional[Group],
+        binding: GroupT,
+        bindings: MutableMapping[GroupT, GroupT] = discord.utils.MISSING,
+        set_on_binding: bool = True,
+    ) -> Command:
+        copy = super()._copy_with(
+            parent=parent, binding=binding, bindings=bindings, set_on_binding=set_on_binding
+        )
+        copy.red_app_command_requires = self.red_app_command_requires
+
+        return copy
+
+    async def _check_can_run(self, interaction: Interaction) -> bool:
+        if not await super()._check_can_run(interaction):
+            return False
+
+        to_check = [self]
+        parent = self
+        while (parent := parent.parent) is not None:
+            to_check.append(parent)
+        if self.binding is not None and self.binding not in to_check:
+            to_check.append(self.binding)
+
+        interaction.extras["red_permission_state"] = PermState.NORMAL
+        for thing in reversed(to_check):
+            app_command_requires: Optional[AppCommandRequires] = getattr(
+                thing, "red_app_command_requires", None
+            )
+            if app_command_requires is not None:
+                ret = await app_command_requires.verify(interaction)
+                if ret is False:
+                    return False
+
+        return True
 
 
 class ContextMenu(dpy_app_commands.ContextMenu):
@@ -139,6 +190,22 @@ class ContextMenu(dpy_app_commands.ContextMenu):
             auto_locale_strings=auto_locale_strings,
             extras=extras,
         )
+        self.red_app_command_requires = AppCommandRequires(
+            privilege_level=getattr(
+                callback, "__red_app_command_requires_privilege_level__", PrivilegeLevel.NONE
+            ),
+            user_perms=getattr(callback, "__red_app_command_requires_user_perms__", {}),
+            bot_perms=getattr(callback, "__red_app_command_requires_bot_perms__", {}),
+            checks=getattr(callback, "__red_app_command_requires_checks__", []),
+        )
+
+    async def _check_can_run(self, interaction: Interaction) -> bool:
+        if not await super()._check_can_run(interaction):
+            return False
+
+        interaction.extras["red_permission_state"] = PermState.NORMAL
+
+        return await self.red_app_command_requires.verify(interaction)
 
 
 @_reset_init_subclass_attrs
@@ -195,6 +262,29 @@ class Group(dpy_app_commands.Group):
             default_permissions=default_permissions,
             extras=extras,
         )
+        self.red_app_command_requires = AppCommandRequires(
+            privilege_level=getattr(
+                self, "__red_app_command_requires_privilege_level__", PrivilegeLevel.NONE
+            ),
+            user_perms=getattr(self, "__red_app_command_requires_user_perms__", {}),
+            bot_perms=getattr(self, "__red_app_command_requires_bot_perms__", {}),
+            checks=getattr(self, "__red_app_command_requires_checks__", []),
+        )
+
+    def _copy_with(
+        self,
+        *,
+        parent: Optional[Group],
+        binding: Binding,
+        bindings: MutableMapping[Group, Group] = discord.utils.MISSING,
+        set_on_binding: bool = True,
+    ) -> Group:
+        copy = super()._copy_with(
+            parent=parent, binding=binding, bindings=bindings, set_on_binding=set_on_binding
+        )
+        copy.red_app_command_requires = self.red_app_command_requires
+
+        return copy
 
     @discord.utils.copy_doc(dpy_app_commands.Group.command)
     def command(

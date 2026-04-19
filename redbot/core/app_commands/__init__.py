@@ -75,6 +75,7 @@ from .commands import (
 from .errors import (
     UserFeedbackCheckFailure as UserFeedbackCheckFailure,
 )
+from .requires import AppCommandRequires as AppCommandRequires
 
 __all__ = (
     "AllChannels",
@@ -137,5 +138,6 @@ __all__ = (
     "Group",
     "command",
     "context_menu",
+    "AppCommandRequires",
     "UserFeedbackCheckFailure",
 )

@@ -44,7 +44,6 @@ from discord.ext.commands import (
 )
 
 from .requires import PermState, PrivilegeLevel, Requires, PermStateAllowedStates
-from .. import app_commands
 from ..i18n import Translator
 
 _T = TypeVar("_T")
@@ -54,6 +53,7 @@ _CogT = TypeVar("_CogT", bound="Cog")
 if TYPE_CHECKING:
     # circular import avoidance
     from .context import Context
+    from redbot.core import app_commands
     from typing_extensions import ParamSpec, Concatenate
     from discord.ext.commands._types import ContextT, Coro
 
@@ -121,6 +121,16 @@ class CogCommandMixin:
             user_perms=getattr(decorated, "__requires_user_perms__", {}),
             bot_perms=getattr(decorated, "__requires_bot_perms__", {}),
             checks=getattr(decorated, "__requires_checks__", []),
+        )
+        from redbot.core.app_commands import AppCommandRequires
+
+        self.red_app_command_requires = AppCommandRequires(
+            privilege_level=getattr(
+                decorated, "__red_app_command_requires_privilege_level__", PrivilegeLevel.NONE
+            ),
+            user_perms=getattr(decorated, "__red_app_command_requires_user_perms__", {}),
+            bot_perms=getattr(decorated, "__red_app_command_requires_bot_perms__", {}),
+            checks=getattr(decorated, "__red_app_command_requires_checks__", []),
         )
 
     def format_text_for_context(self, ctx: "Context", text: str) -> str:

@@ -267,7 +267,8 @@ class Red(
         self._help_formatter = commands.help.RedHelpFormatter()
         self.add_command(commands.help.red_help)
 
-        self._permissions_hooks: List[commands.CheckPredicate] = []
+        self._command_permissions_hooks: List[commands.CheckPredicate] = []
+        self._app_command_permissions_hooks: List[app_commands.CheckPredicate] = []
         self._red_ready = asyncio.Event()
         self._red_before_invoke_objs: Set[PreInvokeCoroutine] = set()
 
@@ -1820,12 +1821,19 @@ class Red(
             return
 
         for cls in inspect.getmro(cog.__class__):
+            for attr in (f"_{cls.__name__}__permissions_hook", "red_command_permissions_hook"):
+                try:
+                    hook = getattr(cog, attr)
+                except AttributeError:
+                    pass
+                else:
+                    self.remove_command_permissions_hook(hook)
             try:
-                hook = getattr(cog, f"_{cls.__name__}__permissions_hook")
+                hook = getattr(cog, "red_app_command_permissions_hook")
             except AttributeError:
                 pass
             else:
-                self.remove_permissions_hook(hook)
+                self.remove_app_command_permissions_hook(hook)
 
         await super().remove_cog(cogname, guild=guild, guilds=guilds)
         self.dispatch("cog_remove", cog)
@@ -2085,26 +2093,44 @@ class Red(
         if not hasattr(cog, "requires"):
             commands.Cog.__init__(cog)
 
-        added_hooks = []
+        added_command_hooks = []
+        added_app_command_hooks = []
 
         try:
             for cls in inspect.getmro(cog.__class__):
+                for attr in (f"_{cls.__name__}__permissions_hook", "red_command_permissions_hook"):
+                    try:
+                        hook = getattr(cog, attr)
+                    except AttributeError:
+                        pass
+                    else:
+                        self.add_command_permissions_hook(hook)
+                        added_command_hooks.append(hook)
                 try:
-                    hook = getattr(cog, f"_{cls.__name__}__permissions_hook")
+                    hook = getattr(cog, "red_app_command_permissions_hook")
                 except AttributeError:
                     pass
                 else:
-                    self.add_permissions_hook(hook)
-                    added_hooks.append(hook)
+                    self.add_app_command_permissions_hook(hook)
+                    added_app_command_hooks.append(hook)
 
             await super().add_cog(cog, guild=guild, guilds=guilds)
             self.dispatch("cog_add", cog)
             if "permissions" not in self.extensions:
                 cog.requires.ready_event.set()
         except Exception:
-            for hook in added_hooks:
+            for hook in added_command_hooks:
                 try:
-                    self.remove_permissions_hook(hook)
+                    self.remove_command_permissions_hook(hook)
+                except Exception:
+                    # This shouldn't be possible
+                    log.exception(
+                        "A hook got extremely screwed up, "
+                        "and could not be removed properly during another error in cog load."
+                    )
+            for hook in added_app_command_hooks:
+                try:
+                    self.remove_app_command_permissions_hook(hook)
                 except Exception:
                     # This shouldn't be possible
                     log.exception(
@@ -2249,8 +2275,8 @@ class Red(
         for command in self.walk_commands():
             command.requires.clear_all_rules(guild_id, **kwargs)
 
-    def add_permissions_hook(self, hook: commands.CheckPredicate) -> None:
-        """Add a permissions hook.
+    def add_command_permissions_hook(self, hook: commands.CheckPredicate) -> None:
+        """Add a text command permissions hook.
 
         Permissions hooks are check predicates which are called before
         calling `Requires.verify`, and they can optionally return an
@@ -2264,12 +2290,14 @@ class Red(
             or ``None``.
 
         """
-        self._permissions_hooks.append(hook)
+        self._command_permissions_hooks.append(hook)
 
-    def remove_permissions_hook(self, hook: commands.CheckPredicate) -> None:
-        """Remove a permissions hook.
+    add_permissions_hook = add_command_permissions_hook
 
-        Parameters are the same as those in `add_permissions_hook`.
+    def remove_command_permissions_hook(self, hook: commands.CheckPredicate) -> None:
+        """Remove a text command permissions hook.
+
+        Parameters are the same as those in `add_command_permissions_hook`.
 
         Raises
         ------
@@ -2277,10 +2305,12 @@ class Red(
             If the permissions hook has not been added.
 
         """
-        self._permissions_hooks.remove(hook)
+        self._command_permissions_hooks.remove(hook)
 
-    async def verify_permissions_hooks(self, ctx: commands.Context) -> Optional[bool]:
-        """Run permissions hooks.
+    remove_permissions_hook = remove_command_permissions_hook
+
+    async def verify_command_permissions_hooks(self, ctx: commands.Context) -> Optional[bool]:
+        """Run text command permissions hooks.
 
         Parameters
         ----------
@@ -2296,7 +2326,7 @@ class Red(
 
         """
         hook_results = []
-        for hook in self._permissions_hooks:
+        for hook in self._command_permissions_hooks:
             result = await discord.utils.maybe_coroutine(hook, ctx)
             if result is not None:
                 hook_results.append(result)
@@ -2307,6 +2337,71 @@ class Red(
             else:
                 ctx.permission_state = commands.PermState.DENIED_BY_HOOK
                 return False
+        return None
+
+    verify_permissions_hooks = verify_command_permissions_hooks
+
+    def add_app_command_permissions_hook(self, hook: commands.CheckPredicate) -> None:
+        """Add an app command permissions hook.
+
+        Permissions hooks are app command check predicates which are called before
+        calling `Requires.verify`, and they can optionally return an
+        override: ``True`` to allow, ``False`` to deny, and ``None`` to
+        default to normal behaviour.
+
+        Parameters
+        ----------
+        hook
+            A command check predicate which returns ``True``, ``False``
+            or ``None``.
+
+        """
+        self._app_command_permissions_hooks.append(hook)
+
+    def remove_app_command_permissions_hook(self, hook: commands.CheckPredicate) -> None:
+        """Remove an app command permissions hook.
+
+        Parameters are the same as those in `add_app_command_permissions_hook`.
+
+        Raises
+        ------
+        ValueError
+            If the permissions hook has not been added.
+
+        """
+        self._app_command_permissions_hooks.remove(hook)
+
+    async def verify_app_command_permissions_hooks(
+        self, interaction: discord.Interaction
+    ) -> Optional[bool]:
+        """Run app command permissions hooks.
+
+        Parameters
+        ----------
+        interaction : discord.Interaction
+            The interaction for the command being invoked.
+
+        Returns
+        -------
+        Optional[bool]
+            ``False`` if any hooks returned ``False``, ``True`` if any
+            hooks return ``True`` and none returned ``False``, ``None``
+            otherwise.
+
+        """
+        hook_results = []
+        for hook in self._app_command_permissions_hooks:
+            result = await discord.utils.maybe_coroutine(hook, interaction)
+            if result is not None:
+                hook_results.append(result)
+        if hook_results:
+            if all(hook_results):
+                interaction.extras["red_permission_state"] = commands.PermState.ALLOWED_BY_HOOK
+                return True
+            else:
+                interaction.extras["red_permission_state"] = commands.PermState.DENIED_BY_HOOK
+                return False
+        return None
 
     async def get_owner_notification_destinations(
         self,

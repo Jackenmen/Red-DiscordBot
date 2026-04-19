@@ -51,7 +51,11 @@ extend functionalities used throughout the bot, as outlined below.
     :members:
 
 .. automodule:: redbot.core.commands.requires
-    :members: PrivilegeLevel, PermState, Requires
+    :members: PrivilegeLevel, PermState
+
+    .. autoclass:: Requires
+        :members:
+        :inherited-members:
 
 .. automodule:: redbot.core.commands.converter
     :members:

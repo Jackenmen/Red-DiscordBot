@@ -6,6 +6,9 @@ requirements. This includes rules which override those requirements,
 as well as custom checks which can be overridden, and some special
 checks like bot permissions checks.
 """
+
+from __future__ import annotations
+
 import asyncio
 import enum
 import inspect
@@ -33,6 +36,7 @@ from .errors import BotMissingPermissions
 from redbot.core import utils
 
 if TYPE_CHECKING:
+    from redbot.core.bot import Red
     from .commands import Command
     from .context import Context
 
@@ -135,6 +139,29 @@ class PrivilegeLevel(enum.IntEnum):
                 return cls.ADMIN
         for snowflake in await guild_settings.mod_role():
             if ctx.author.get_role(snowflake):
+                return cls.MOD
+
+        return cls.NONE
+
+    @classmethod
+    async def from_interaction(cls, interaction: discord.Interaction["Red"]) -> "PrivilegeLevel":
+        """Get a command author's PrivilegeLevel based on an interaction."""
+        if await interaction.client.is_owner(interaction.user):
+            return cls.BOT_OWNER
+        elif interaction.guild is None:
+            return cls.NONE
+        elif interaction.user == interaction.guild.owner:
+            return cls.GUILD_OWNER
+
+        # The following is simply an optimised way to check if the user has the
+        # admin or mod role.
+        guild_settings = interaction.client._config.guild(interaction.guild)
+
+        for snowflake in await guild_settings.admin_role():
+            if interaction.user.get_role(snowflake):
+                return cls.ADMIN
+        for snowflake in await guild_settings.mod_role():
+            if interaction.user.get_role(snowflake):
                 return cls.MOD
 
         return cls.NONE
@@ -275,17 +302,17 @@ def transition_permstate_to(prev: PermState, next_state: PermState) -> Transitio
     return PermStateTransitions[prev][next_state]
 
 
-class Requires:
-    """This class describes the requirements for executing a specific command.
+class RequiresBase:
+    """
+    This is a base class for shared parts of the logic for describing the requirements
+    of executing a specific command. Separate subclasses of it are used for implementing
+    app commands and text command.
 
     The permissions described include both bot permissions and user
     permissions.
 
     Attributes
     ----------
-    checks : List[Callable[[Context], Union[bool, Awaitable[bool]]]]
-        A list of checks which can be overridden by rules. Use
-        `Command.checks` if you would like them to never be overridden.
     privilege_level : PrivilegeLevel
         The required privilege level (bot owner, admin, etc.) for users
         to execute the command. Can be ``None``, in which case the
@@ -322,9 +349,7 @@ class Requires:
         privilege_level: Optional[PrivilegeLevel],
         user_perms: Union[Dict[str, bool], discord.Permissions, None],
         bot_perms: Union[Dict[str, bool], discord.Permissions],
-        checks: List[CheckPredicate],
     ):
-        self.checks: List[CheckPredicate] = checks
         self.privilege_level: Optional[PrivilegeLevel] = privilege_level
         self.ready_event = asyncio.Event()
 
@@ -343,36 +368,6 @@ class Requires:
             self.bot_perms = bot_perms
         self._global_rules: _RulesDict = _RulesDict()
         self._guild_rules: _IntKeyDict[_RulesDict] = _IntKeyDict[_RulesDict]()
-
-    @staticmethod
-    def get_decorator(
-        privilege_level: Optional[PrivilegeLevel], user_perms: Optional[Dict[str, bool]]
-    ) -> Callable[["_CommandOrCoro"], "_CommandOrCoro"]:
-        if not user_perms:
-            user_perms = None
-
-        def decorator(func: "_CommandOrCoro") -> "_CommandOrCoro":
-            if inspect.iscoroutinefunction(func):
-                func.__requires_privilege_level__ = privilege_level
-                if user_perms is None:
-                    func.__requires_user_perms__ = None
-                else:
-                    _validate_perms_dict(user_perms)
-                    if getattr(func, "__requires_user_perms__", None) is None:
-                        func.__requires_user_perms__ = discord.Permissions.none()
-                    func.__requires_user_perms__.update(**user_perms)
-            else:
-                func.requires.privilege_level = privilege_level
-                if user_perms is None:
-                    func.requires.user_perms = None
-                else:
-                    _validate_perms_dict(user_perms)
-                    if func.requires.user_perms is None:
-                        func.requires.user_perms = discord.Permissions.none()
-                    func.requires.user_perms.update(**user_perms)
-            return func
-
-        return decorator
 
     def get_rule(self, model: Union[int, str, PermissionModel], guild_id: int) -> PermState:
         """Get the rule for a particular model.
@@ -459,11 +454,99 @@ class Requires:
         """Reset this Requires object to its original state.
 
         This will clear all rules, including defaults. It also resets
-        the `Requires.ready_event`.
+        the ``ready_event``.
         """
         self._guild_rules.clear()  # pylint: disable=no-member
         self._global_rules.clear()  # pylint: disable=no-member
         self.ready_event.clear()
+
+    def _get_would_invoke(self, guild_id: Optional[int]) -> Optional[bool]:
+        default_rule = PermState.NORMAL
+        if guild_id is not None:
+            default_rule = self.get_rule(self.DEFAULT, guild_id=guild_id)
+        if default_rule is PermState.NORMAL:
+            default_rule = self.get_rule(self.DEFAULT, self.GLOBAL)
+
+        if default_rule == PermState.ACTIVE_DENY:
+            return False
+        elif default_rule == PermState.ACTIVE_ALLOW:
+            return True
+        else:
+            return None
+
+    @staticmethod
+    def _missing_perms(
+        required: discord.Permissions, actual: discord.Permissions
+    ) -> discord.Permissions:
+        # Explained in set theory terms:
+        #   Assuming R is the set of required permissions, and A is
+        #   the set of the user's permissions, the set of missing
+        #   permissions will be equal to R \ A, i.e. the relative
+        #   complement/difference of A with respect to R.
+        relative_complement = required.value & ~actual.value
+        return discord.Permissions(relative_complement)
+
+    def __repr__(self) -> str:
+        return (
+            f"<Requires privilege_level={self.privilege_level!r} user_perms={self.user_perms!r} "
+            f"bot_perms={self.bot_perms!r}>"
+        )
+
+
+class Requires(RequiresBase):
+    """
+    This class describes the requirements for executing a specific text command.
+
+    The permissions described include both bot permissions and user
+    permissions.
+
+    Attributes
+    ----------
+    checks : List[Callable[[Context], Union[bool, Awaitable[bool]]]]
+        A list of checks which can be overridden by rules. Use
+        `Command.checks` if you would like them to never be overridden.
+
+    """
+
+    def __init__(
+        self,
+        privilege_level: Optional[PrivilegeLevel],
+        user_perms: Union[Dict[str, bool], discord.Permissions, None],
+        bot_perms: Union[Dict[str, bool], discord.Permissions],
+        checks: List[CheckPredicate],
+    ):
+        super().__init__(privilege_level, user_perms, bot_perms)
+        self.checks: List[CheckPredicate] = checks
+
+    @staticmethod
+    def get_decorator(
+        privilege_level: Optional[PrivilegeLevel], user_perms: Optional[Dict[str, bool]]
+    ) -> Callable[["_CommandOrCoro"], "_CommandOrCoro"]:
+        if not user_perms:
+            user_perms = None
+
+        def decorator(func: "_CommandOrCoro") -> "_CommandOrCoro":
+            if inspect.iscoroutinefunction(func):
+                func.__requires_privilege_level__ = privilege_level
+                if user_perms is None:
+                    func.__requires_user_perms__ = None
+                else:
+                    _validate_perms_dict(user_perms)
+                    if getattr(func, "__requires_user_perms__", None) is None:
+                        func.__requires_user_perms__ = discord.Permissions.none()
+                    func.__requires_user_perms__.update(**user_perms)
+            else:
+                func.requires.privilege_level = privilege_level
+                if user_perms is None:
+                    func.requires.user_perms = None
+                else:
+                    _validate_perms_dict(user_perms)
+                    if func.requires.user_perms is None:
+                        func.requires.user_perms = discord.Permissions.none()
+                    func.requires.user_perms.update(**user_perms)
+            return func
+
+        return decorator
 
     async def verify(self, ctx: "Context") -> bool:
         """Check if the given context passes the requirements.
@@ -501,7 +584,7 @@ class Requires:
         if self.privilege_level is PrivilegeLevel.BOT_OWNER:
             return False
 
-        hook_result = await ctx.bot.verify_permissions_hooks(ctx)
+        hook_result = await ctx.bot.verify_command_permissions_hooks(ctx)
         if hook_result is not None:
             return hook_result
 
@@ -524,7 +607,7 @@ class Requires:
         elif isinstance(next_state, dict):
             # NORMAL to PASSIVE_ALLOW; should we proceed as normal or transition?
             # We must check what would happen normally, if no explicit rules were set.
-            would_invoke = self._get_would_invoke(ctx)
+            would_invoke = self._get_would_invoke(ctx.guild and ctx.guild.id)
             if would_invoke is None:
                 would_invoke = await self._verify_user(ctx)
             next_state = next_state[would_invoke]
@@ -537,20 +620,6 @@ class Requires:
         prev_state = ctx.permission_state
         cur_state = self._get_rule_from_ctx(ctx)
         return transition_permstate_to(prev_state, cur_state)
-
-    def _get_would_invoke(self, ctx: "Context") -> Optional[bool]:
-        default_rule = PermState.NORMAL
-        if ctx.guild is not None:
-            default_rule = self.get_rule(self.DEFAULT, guild_id=ctx.guild.id)
-        if default_rule is PermState.NORMAL:
-            default_rule = self.get_rule(self.DEFAULT, self.GLOBAL)
-
-        if default_rule == PermState.ACTIVE_DENY:
-            return False
-        elif default_rule == PermState.ACTIVE_ALLOW:
-            return True
-        else:
-            return None
 
     async def _verify_user(self, ctx: "Context") -> bool:
         checks_pass = await self._verify_checks(ctx)
@@ -616,24 +685,6 @@ class Requires:
         if not self.checks:
             return True
         return await discord.utils.async_all(check(ctx) for check in self.checks)
-
-    @staticmethod
-    def _missing_perms(
-        required: discord.Permissions, actual: discord.Permissions
-    ) -> discord.Permissions:
-        # Explained in set theory terms:
-        #   Assuming R is the set of required permissions, and A is
-        #   the set of the user's permissions, the set of missing
-        #   permissions will be equal to R \ A, i.e. the relative
-        #   complement/difference of A with respect to R.
-        relative_complement = required.value & ~actual.value
-        return discord.Permissions(relative_complement)
-
-    def __repr__(self) -> str:
-        return (
-            f"<Requires privilege_level={self.privilege_level!r} user_perms={self.user_perms!r} "
-            f"bot_perms={self.bot_perms!r}>"
-        )
 
 
 # check decorators

@@ -22,5 +22,9 @@ extend functionalities used throughout the bot, as outlined below.
 .. autoclass:: redbot.core.app_commands.ContextMenu
     :members:
 
+.. autoclass:: redbot.core.app_commands.requires.AppCommandRequires
+    :members:
+    :inherited-members:
+
 .. autoclass:: redbot.core.app_commands.UserFeedbackCheckFailure
     :members:
