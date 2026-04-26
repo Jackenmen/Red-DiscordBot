@@ -17,6 +17,7 @@ rich
 schema
 typing_extensions
 yarl
+uuid-backport
 distro; sys_platform == "linux"
 # https://github.com/MagicStack/uvloop/issues/702
 uvloop>=0.21.0,!=0.22.0,!=0.22.1; sys_platform != "win32" and platform_python_implementation == "CPython"

@@ -28,6 +28,8 @@ from typing import (
 )
 
 import discord
+import uuid_backport as uuid
+
 from redbot.core import data_manager, commands, Config
 from redbot.core.utils._internal_utils import safe_delete
 from redbot.core.i18n import Translator
@@ -136,6 +138,7 @@ class Repo(RepoJSONMixin):
 
     def __init__(
         self,
+        id: uuid.UUID,
         name: str,
         url: str,
         branch: Optional[str],
@@ -143,6 +146,7 @@ class Repo(RepoJSONMixin):
         folder_path: Path,
         available_modules: Tuple[Installable, ...] = (),
     ):
+        self.id = id
         self.url = url
         self.branch = branch
         self.commit = commit
@@ -1000,8 +1004,8 @@ class Repo(RepoJSONMixin):
         )
 
     @classmethod
-    async def from_folder(cls, folder: Path, branch: str = "") -> Repo:
-        repo = cls(name=folder.name, url="", branch=branch, commit="", folder_path=folder)
+    async def from_folder(cls, id: uuid.UUID, folder: Path, *, branch: str = "") -> Repo:
+        repo = cls(id=id, name=folder.name, url="", branch=branch, commit="", folder_path=folder)
         repo.url = await repo.current_url()
         if branch == "":
             repo.branch = await repo.current_branch()
@@ -1011,6 +1015,10 @@ class Repo(RepoJSONMixin):
         return repo
 
 
+_REPOS_BY_NAME = "REPOS_BY_NAME"
+_REPOS_BY_ID = "REPOS_BY_ID"
+
+
 class RepoManager:
     GITHUB_OR_GITLAB_RE = re.compile(r"https?://git(?:hub)|(?:lab)\.com/")
     TREE_URL_RE = re.compile(r"(?P<tree>/tree)/(?P<branch>\S+)$")
@@ -1018,7 +1026,35 @@ class RepoManager:
     def __init__(self) -> None:
         self._repos: Dict[str, Repo] = {}
         self.config = Config.get_conf(self, identifier=170708480, force_registration=True)
-        self.config.register_global(repos={})
+        self.config.register_global(schema_version=0)
+        # {repo_name: {...}}
+        self.config.init_custom(_REPOS_BY_NAME, 1)
+        self.config.register_custom(_REPOS_BY_NAME, id="")
+        # {repo_id: {...}}
+        self.config.init_custom(_REPOS_BY_ID, 1)
+        self.config.register_custom(_REPOS_BY_ID, name="", branch="")
+
+    async def _migrate_schema_1_to_2(self) -> Dict[str, Dict[str, str]]:
+        old_repos_config = await self.config.repos.get_raw("repos", {})
+        repos_by_name = {}
+        repos_by_id = {}
+
+        self.repos_folder.mkdir(parents=True, exist_ok=True)
+        for folder in self.repos_folder.iterdir():
+            if not folder.is_dir():
+                continue
+            id_ = str(uuid.uuid7())
+            repos_by_name[folder.name] = {"id": id_}
+            repos_by_id[id_] = {"name": folder.name}
+            if branch := old_repos_config.get(folder.name):
+                repos_by_id[folder.name]["branch"] = branch
+            folder.rename(folder.with_name(id_))
+
+        await self.config.custom(_REPOS_BY_NAME).set(repos_by_name)
+        await self.config.custom(_REPOS_BY_ID).set(repos_by_id)
+        await self.config.clear_raw("repos")
+
+        return repos_by_name
 
     async def initialize(self) -> None:
         await self._load_repos(set_repos=True)
@@ -1029,7 +1065,7 @@ class RepoManager:
         return data_folder / "repos"
 
     def does_repo_exist(self, name: str) -> bool:
-        return name in self._repos
+        return name.lower() in self._repos
 
     @staticmethod
     def validate_and_normalize_repo_name(name: str) -> str:
@@ -1055,6 +1091,7 @@ class RepoManager:
             New Repo object representing the cloned repository.
 
         """
+        name = name.lower()
         if self.does_repo_exist(name):
             raise errors.ExistingGitRepo(
                 "That repo name you provided already exists. Please choose another."
@@ -1062,12 +1099,18 @@ class RepoManager:
 
         url, branch = self._parse_url(url, branch)
 
+        # reuse UUID used for the name, if repo is recreated with same name
+        uuid_hex = await self.config.custom(_REPOS_BY_NAME, name).id()
+        id_ = uuid.UUID(uuid_hex) if uuid_hex else uuid.uuid7()
         # noinspection PyTypeChecker
         r = Repo(
-            url=url, name=name, branch=branch, commit="", folder_path=self.repos_folder / name
+            id=id_, url=url, name=name, branch=branch, commit="", folder_path=self.repos_folder / name
         )
         await r.clone()
-        await self.config.repos.set_raw(name, value=r.branch)
+        if not uuid_hex:
+            uuid_hex = str(id_)
+            await self.config.custom(_REPOS_BY_NAME, name).id.set(uuid_hex)
+        await self.config.custom(_REPOS_BY_ID, uuid_hex).set({"name": r.name, "branch": r.branch})
 
         self._repos[name] = r
 
@@ -1087,7 +1130,7 @@ class RepoManager:
             Repo object for the repository, if it exists.
 
         """
-        return self._repos.get(name, None)
+        return self._repos.get(name.lower(), None)
 
     @property
     def repos(self) -> Tuple[Repo, ...]:
@@ -1131,6 +1174,7 @@ class RepoManager:
             If the repo does not exist.
 
         """
+        name = name.lower()
         repo = self.get_repo(name)
         if repo is None:
             raise errors.MissingGitRepo(f"There is no repo with the name {name}")
@@ -1157,7 +1201,7 @@ class RepoManager:
             A 2-`tuple` with Repo object and a 2-`tuple` of `str`
             containing old and new commit hashes.
         """
-        repo = self._repos[repo_name]
+        repo = self._repos[repo_name.lower()]
         old, new = await repo.update()
         return (repo, (old, new))
 
@@ -1216,8 +1260,10 @@ class RepoManager:
             if not folder.is_dir():
                 continue
             try:
-                branch = await self.config.repos.get_raw(folder.name, default="")
-                ret[folder.name] = await Repo.from_folder(folder, branch)
+                repo_info = await self.config.custom(_REPOS_BY_NAME, folder.name).all()
+                id_ = uuid.UUID(repo_info["id"])
+                branch = repo_info["branch"]
+                ret[folder.name] = await Repo.from_folder(id_, folder, branch=branch)
                 if branch == "":
                     await self.config.repos.set_raw(folder.name, value=ret[folder.name].branch)
             except errors.NoRemoteURL:

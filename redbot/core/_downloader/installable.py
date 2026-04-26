@@ -6,6 +6,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union, cast
 
+import uuid_backport as uuid
+
 from .log import log
 from .info_schemas import INSTALLABLE_SCHEMA, update_mixin
 from .json_mixins import RepoJSONMixin
@@ -159,7 +161,8 @@ class InstalledModule(Installable):
         repo: Optional[Repo] = None,
         commit: str = "",
         pinned: bool = False,
-        json_repo_name: str = "",
+        *,
+        repo_id: uuid.UUID,
     ):
         super().__init__(location=location, repo=repo, commit=commit)
         self.pinned: bool = pinned if self.type is InstallableType.COG else False
@@ -180,7 +183,7 @@ class InstalledModule(Installable):
     def from_json(
         cls, data: Dict[str, Union[str, bool]], repo_mgr: RepoManager
     ) -> InstalledModule:
-        repo_name = cast(str, data["repo_name"])
+        repo_id = uuid.UUID(cast(str, data["repo_id"]))
         cog_name = cast(str, data["module_name"])
         commit = cast(str, data.get("commit", ""))
         pinned = cast(bool, data.get("pinned", False))

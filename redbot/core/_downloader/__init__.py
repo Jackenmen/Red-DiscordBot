@@ -34,6 +34,8 @@ from typing import (
 )
 
 import discord
+import uuid_backport as uuid
+
 from redbot.core import commands, Config, version_info as red_version_info
 from redbot.core._cog_manager import CogManager
 from redbot.core.data_manager import cog_data_path
@@ -71,6 +73,11 @@ async def _init_without_bot(cog_manager: CogManager) -> None:
 
     start = time.perf_counter()
 
+    global _repo_manager
+    # `initialize()` has to be called after migration but it has to be initialized
+    # as some migrations call migration methods on the (uninitialized) repo manager.
+    _repo_manager = RepoManager()
+
     global _config
     _config = Config.get_conf(None, 998240343, cog_name="Downloader", force_registration=True)
     _config.register_global(schema_version=0, installed_cogs={}, installed_libraries={})
@@ -82,8 +89,6 @@ async def _init_without_bot(cog_manager: CogManager) -> None:
     _SHAREDLIB_INIT = SHAREDLIB_PATH / "__init__.py"
     _create_lib_folder()
 
-    global _repo_manager
-    _repo_manager = RepoManager()
     await _repo_manager.initialize()
 
     stop = time.perf_counter()
@@ -99,6 +104,16 @@ async def _migrate_config() -> None:
 
     if schema_version == 0:
         await _schema_0_to_1()
+        schema_version += 1
+        await _config.schema_version.set(schema_version)
+
+    if schema_version == 2:
+        await _schema_2_to_3()
+        schema_version += 1
+        await _config.schema_version.set(schema_version)
+
+    if schema_version == 3:
+        await _schema_3_to_4()
         schema_version += 1
         await _config.schema_version.set(schema_version)
 
@@ -126,6 +141,23 @@ async def _schema_0_to_1():
     await _config.clear_raw("installed")
     # no reliable way to get installed libraries (i.a. missing repo name)
     # but it only helps `[p]cog update` run faster so it's not an issue
+
+
+async def _schema_2_to_3():
+    """
+    This assigns UUIDs to all repositories and updates installed cog references to use them.
+    """
+    repos_by_name = await _repo_manager._migrate_schema_1_to_2()
+    old_conf = await _config.installed_cogs()
+    new_conf = {}
+    nil_id = str(uuid.NIL)
+    for repo_name, cogs in old_conf.items():
+        repo_id = repos_by_name.get(repo_name, {"id": nil_id})["id"]
+        for cog_info in cogs.values():
+            cog_info["repo_id"] = repo_id
+            del cog_info["repo_name"]
+        new_conf[repo_id] = cogs
+    await _config.installed_cogs.set(new_conf)
 
 
 def _create_lib_folder(*, remove_first: bool = False) -> None:
@@ -525,7 +557,7 @@ async def _get_cogs_to_check(
 
 
 async def pip_install(*deps: str) -> bool:
-    repo = Repo("", "", "", "", Path.cwd())
+    repo = Repo(uuid.NIL, "", "", "", "", Path.cwd())
     return await repo.install_raw_requirements(deps, LIB_PATH)
 
 

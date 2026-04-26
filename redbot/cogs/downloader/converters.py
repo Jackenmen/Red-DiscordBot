@@ -22,6 +22,7 @@ class InstalledCog(InstalledModule):
 class Repo(_Repo):
     @classmethod
     async def convert(cls, ctx: commands.Context, argument: str) -> _Repo:
+        argument = argument.lower()
         poss_repo = _downloader._repo_manager.get_repo(argument)
         if poss_repo is None:
             raise commands.BadArgument(

@@ -72,6 +72,8 @@ typing-extensions==4.13.2
     # via
     #   -r base.in
     #   multidict
+uuid-backport==0.1.2
+    # via -r base.in
 yarl==1.15.2
     # via
     #   -r base.in
