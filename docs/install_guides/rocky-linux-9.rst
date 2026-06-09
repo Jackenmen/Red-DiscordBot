@@ -1,4 +1,10 @@
 .. _install-rocky-linux-9:
+.. os-image-location::
+
+    [rocky-linux-9]
+    download_type = 'checksum-file'
+    url = 'https://download.rockylinux.org/pub/rocky/9/images/x86_64/CHECKSUM'
+    filename_pattern = 'Rocky-9-GenericCloud\.latest\.x86_64\.qcow2'
 
 ===============================
 Installing Red on Rocky Linux 9

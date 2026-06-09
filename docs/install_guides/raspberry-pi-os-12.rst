@@ -1,4 +1,27 @@
 .. _install-raspberry-pi-os-12:
+.. os-image-location::
+
+    [raspberry-pi-os-12]
+    download_type = 'html'
+    url = 'https://www.raspberrypi.com/software/operating-systems/'
+    url_xpath = '''
+    .//a[
+        starts-with(
+            @href,
+            'https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64/images/raspios_oldstable_lite_arm64-'
+        )
+        and ends-with(@href, '.img.xz')
+    ]/@href
+    '''
+    checksum_xpath = '''
+    .//a[
+        starts-with(
+            @href,
+            'https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64/images/raspios_oldstable_lite_arm64-'
+        )
+        and ends-with(@href, '.img.xz')
+    ]/../preceding-sibling::*/details/*[2]/text()
+    '''
 
 ======================================================
 Installing Red on Raspberry Pi OS (Legacy) 12 Bookworm
