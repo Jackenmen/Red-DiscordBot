@@ -1,4 +1,29 @@
 .. _install-ubuntu-2604:
+.. os-image-location::
+
+    [ubuntu-2604]
+    download_type = 'checksum-file'
+    url = 'https://cloud-images.ubuntu.com/resolute/current/SHA256SUMS'
+    filename_pattern = 'resolute-server-cloudimg-amd64\.img'
+
+    [ubuntu-2604-amd64v3]
+    download_type = 'checksum-file'
+    url = 'https://cloud-images.ubuntu.com/resolute/current/SHA256SUMS'
+    filename_pattern = 'resolute-server-cloudimg-amd64v3\.img'
+
+    [ubuntu-2604-arm]
+    download_type = 'checksum-file'
+    arch = 'aarch64'
+    url = 'https://cloud-images.ubuntu.com/resolute/current/SHA256SUMS'
+    filename_pattern = 'resolute-server-cloudimg-arm64\.img'
+
+    [ubuntu-2604-arm-raspi]
+    download_type = 'checksum-file'
+    arch = 'aarch64'
+    machine_type = 'raspi3b'
+    image_format = 'raw+xz'
+    url = 'https://cdimage.ubuntu.com/ubuntu-server/resolute/daily-preinstalled/current/SHA256SUMS'
+    filename_pattern = 'resolute-preinstalled-server-arm64\+raspi\.img\.xz'
 
 ==================================
 Installing Red on Ubuntu 26.04 LTS
