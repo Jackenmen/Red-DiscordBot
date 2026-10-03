@@ -1,4 +1,20 @@
 .. _install-debian-12:
+.. os-image-location::
+
+    [debian-12]
+    download_type = 'checksum-file'
+    url = 'https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS'
+    checksum_type = 'sha512'
+    filename_pattern = 'debian-12-generic-amd64\.qcow2'
+    expected_java_version = 17
+
+    [debian-12-arm]
+    download_type = 'checksum-file'
+    arch = 'aarch64'
+    url = 'https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS'
+    checksum_type = 'sha512'
+    filename_pattern = 'debian-12-genericcloud-arm64\.qcow2'
+    expected_java_version = 17
 
 ====================================
 Installing Red on Debian 12 Bookworm

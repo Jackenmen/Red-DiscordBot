@@ -299,7 +299,13 @@ class Updater:
     async def _prepare_metadata(self) -> None:
         interpreter_info = self.options.new_python_interpreter or PythonInfo.current_system()
         with self.console.status("Checking latest version..."):
-            available_versions = await fetch_available_red_versions()
+            available_versions = await fetch_available_red_versions(
+                include_prereleases=(
+                    self.options.red_version.is_prerelease
+                    if self.options.red_version is not None
+                    else common.get_current_red_version().is_prerelease
+                )
+            )
             latest_major = available_versions[0]
 
         self.metadata = UpdaterMetadata(
@@ -310,7 +316,10 @@ class Updater:
         )
 
         if self.options.red_version:
-            if self.options.red_version <= self.current_version:
+            if self.options.red_version < self.current_version or (
+                not self.options.force_reinstall
+                and self.options.red_version == self.current_version
+            ):
                 common.print_with_prefix_column(
                     common.ICON_ERROR, "You can only update to a newer version of Red."
                 )
@@ -644,6 +653,7 @@ class Updater:
                 "redbot.setup",
                 "backup",
                 *debug_args,
+                "--",
                 instance_name,
                 str(instance_backups_dir),
             )

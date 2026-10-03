@@ -1,4 +1,10 @@
 .. _install-arch:
+.. os-image-location::
+
+    [arch-linux]
+    download_type = 'checksum-file'
+    url = 'https://fastly.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2.SHA256'
+    filename_pattern = '.*\.qcow2'
 
 ============================
 Installing Red on Arch Linux
@@ -16,7 +22,7 @@ Install the pre-requirements with pacman:
 
 .. prompt:: bash
 
-    sudo pacman -Syu git jre17-openjdk-headless base-devel nano
+    sudo pacman -Syu git jre25-openjdk-headless base-devel nano
 
 On Arch Linux, Python 3.11 can be installed from the Arch User Repository (AUR) from the ``python311`` package.
 
