@@ -18,6 +18,16 @@
     url = 'https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26200.6584.250915-1905.25h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso'
     checksum = 'sha256:a61adeab895ef5a4db436e0a7011c92a2ff17bb0357f58b13bbc4062e535e7b9'
 
+    [windows-11-arm]
+    os = 'windows'
+    arch = 'aarch64'
+    download_type = 'direct-url'
+    image_format = 'raw'
+    # This is Windows 11 24H2 as there are no evaluation ISOs of newer versions for ARM
+    # https://web.archive.org/web/20250814192029/https://www.microsoft.com/en-us/evalcenter/download-windows-11-enterprise
+    url = 'https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26100.1.240331-1435.ge_release_CLIENTENTERPRISEEVAL_OEMRET_A64FRE_en-us.iso'
+    checksum = 'sha256:dad633276073f14f3e0373ef7e787569e216d54942ce522b39451c8f2d38ad43'
+
 =========================
 Installing Red on Windows
 =========================
