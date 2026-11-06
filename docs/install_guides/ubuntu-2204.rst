@@ -41,7 +41,7 @@
     [ubuntu-2204-arm-raspi]
     download_type = 'checksum-file'
     arch = 'aarch64'
-    machine_type = 'raspi3b'
+    machine_type = 'raspi4b'
     image_format = 'raw+xz'
     url = 'https://cdimage.ubuntu.com/ubuntu/releases/jammy/release/SHA256SUMS'
     filename_pattern = 'ubuntu-22\.04\.\d+-preinstalled-server-arm64\+raspi\.img\.xz'

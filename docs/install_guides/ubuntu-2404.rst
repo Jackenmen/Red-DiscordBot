@@ -41,7 +41,7 @@
     [ubuntu-2404-arm-raspi]
     download_type = 'html'
     arch = 'aarch64'
-    machine_type = 'raspi3b'
+    machine_type = 'raspi4b'
     image_format = 'raw+xz'
     url = 'https://cdimage.ubuntu.com/ubuntu-server/noble/daily-preinstalled/current/'
     url_xpath = '''
