@@ -74,14 +74,20 @@ Enabling Privileged Intents
     .. image:: /.resources/bot-guide/discord_bot_tab.png
         :alt: The bot tab in the application overview page.
 
-5. Scroll down to the "Privileged Gateway Intents" section, enable all three privileged intents and save your changes.
+5. Scroll down to the "Privileged Gateway Intents" section, enable the "message" and "member" privileged intents, then save your changes.
 
     .. image:: /.resources/bot-guide/discord_privileged_intents.png
         :alt: The privileged gateway intents selector.
 
 .. warning::
 
-    Red bots with over 100 servers require `bot verification <https://support.discord.com/hc/en-us/articles/360040720412>`_ which is not covered in this guide.
-    Remember that :ref:`we do not support public bots <intents>`. We encourage you to read that page before scaling up your bot.
+    Red bots with over 100 servers require `bot verification <https://support.discord.com/hc/en-us/articles/360040720412>`_ and 
+    Red bots with over 10,000 total members `require intent privileged intent review https://docs.discord.com/developers/gateway/getting-started-with-privileged-intent-review`_
+    both of which are not covered in this guide.
+    Bots that require verification are considered public bots. Remember that :ref:`we do not support public bots <intents>`. We encourage you to read that page before scaling up your bot.
+
+.. note::
+
+    While presences intent can also be enabled, it is not required for the bot to function. You may need it later on to enable certain funtionality of third party cogs.
 
 *Parts of this guide have been adapted from* `discord.py intro <https://discordpy.readthedocs.io/en/stable/discord.html#discord-intro>`_ *and* `discord.py privileged intents <https://discordpy.readthedocs.io/en/stable/intents.html#privileged-intents>`_.
