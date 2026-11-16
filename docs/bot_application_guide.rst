@@ -82,7 +82,7 @@ Enabling Privileged Intents
 .. warning::
 
     Red bots with over 100 servers require `bot verification <https://support.discord.com/hc/en-us/articles/360040720412>`_ and 
-    Red bots with over 10,000 total members `require intent privileged intent review https://docs.discord.com/developers/gateway/getting-started-with-privileged-intent-review`_
+    Red bots with over 10,000 total members `require intent privileged intent review <https://docs.discord.com/developers/gateway/getting-started-with-privileged-intent-review>`_
     both of which are not covered in this guide.
     Bots that require verification are considered public bots. Remember that :ref:`we do not support public bots <intents>`. We encourage you to read that page before scaling up your bot.
 
